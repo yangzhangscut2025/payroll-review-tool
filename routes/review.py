@@ -202,7 +202,19 @@ def save_field(field_id):
     if 'corrected_links' in data:
         field.set_corrected_links(data['corrected_links'])
 
-    db.session.commit()
+    from sqlalchemy.exc import OperationalError
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            db.session.commit()
+            break
+        except OperationalError as e:
+            db.session.rollback()
+            if attempt < max_retries - 1:
+                time.sleep(0.3 * (attempt + 1))
+            else:
+                return jsonify({'error': '数据库忙，请重试'}), 503
 
     # Update module completion
     _update_module_progress(project, field.module_l1)

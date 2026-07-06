@@ -2,6 +2,32 @@
 let activeQuill = null;
 let activeEditorData = null;
 
+// ==================== Fetch with retry ====================
+
+async function fetchWithRetry(url, options, maxRetries) {
+    maxRetries = maxRetries || 3;
+    var lastError = null;
+    for (var i = 0; i < maxRetries; i++) {
+        try {
+            var resp = await fetch(url, options);
+            if (resp.ok) return resp;
+            var body = await resp.json();
+            if (body.error === '数据库忙，请重试') {
+                lastError = new Error(body.error);
+                await new Promise(function(r) { setTimeout(r, 500 * (i + 1)); });
+                continue;
+            }
+            return resp;
+        } catch (e) {
+            lastError = e;
+            if (i < maxRetries - 1) {
+                await new Promise(function(r) { setTimeout(r, 500 * (i + 1)); });
+            }
+        }
+    }
+    throw lastError;
+}
+
 // ==================== Quill ====================
 
 function createQuill(selector, content) {
@@ -120,7 +146,7 @@ function saveLinkStatus(el) {
         var inp = row ? row.querySelector('.corrected-link-input') : null;
         if (inp) inp.style.display = ['打不开','内容不符','已过时'].indexOf(s.value) !== -1 ? 'inline-block' : 'none';
     });
-    fetch('/api/review/' + fieldId + '/save', {
+    fetchWithRetry('/api/review/' + fieldId + '/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ link_statuses: linkStatuses, corrected_links: correctedLinks })
@@ -197,7 +223,7 @@ function bindAllEvents() {
             var status = this.dataset.status;
             if (!fieldId || fieldId === '0') return;
             try {
-                var resp = await fetch('/api/review/' + fieldId + '/save', {
+                var resp = await fetchWithRetry('/api/review/' + fieldId + '/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: status })
@@ -254,7 +280,7 @@ async function saveEdit() {
     var note = noteEl ? noteEl.value : '';
 
     try {
-        var resp = await fetch('/api/review/' + d.fieldId + '/save', {
+        var resp = await fetchWithRetry('/api/review/' + d.fieldId + '/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ changed_content: html, internal_note: note })
