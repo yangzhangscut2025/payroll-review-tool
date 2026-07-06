@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} - 项目详情{% endblock %}
+{% block content %}
+
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('projects.project_list') }}">项目列表</a></li>
+        <li class="breadcrumb-item active">{{ project.name }}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <!-- Left: Project Info Card -->
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">📁 {{ project.name }}</h5>
+                <span class="badge {% if project.status == '已完成' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                    {{ project.status }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>国家：</strong>{{ project.country }}</div>
+                    <div class="col-md-3"><strong>负责人：</strong>{{ project.created_by }}</div>
+                    <div class="col-md-3"><strong>创建时间：</strong>{{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else '-' }}</div>
+                    <div class="col-md-3"><strong>最后更新：</strong>{{ project.updated_at.strftime('%Y-%m-%d %H:%M') if project.updated_at else '-' }}</div>
+                </div>
+
+                <!-- Overall Progress -->
+                <h6>📊 总体进度</h6>
+                <div class="d-flex align-items-center mb-2">
+                    <div class="progress flex-grow-1 me-2" style="height: 10px;">
+                        {% set pct = (project.completed_modules / project.total_modules * 100) if project.total_modules > 0 else 0 %}
+                        <div class="progress-bar {% if pct == 100 %}bg-success{% endif %}"
+                             style="width: {{ pct|int }}%">{{ pct|int }}%</div>
+                    </div>
+                    <span class="text-nowrap">{{ project.completed_modules }}/{{ project.total_modules }} 模块</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module Assignment Table -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">📋 模块分配</h6>
+            </div>
+            <div class="card-body p-0">
+                {% if l1_modules %}
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>l1 模块</th>
+                            <th>字段数</th>
+                            <th>已完成</th>
+                            <th>校验人</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for l1_name, stats in l1_modules.items() %}
+                        {% set ma = assigned_map.get(l1_name) %}
+                        <tr>
+                            <td class="fw-medium">{{ l1_name }}</td>
+                            <td>{{ stats.total }}</td>
+                            <td>{{ stats.completed }}</td>
+                            <td>
+                                {% if project.created_by == username %}
+                                <select class="form-select form-select-sm assign-select"
+                                        data-l1="{{ l1_name }}" data-project="{{ project.id }}">
+                                    <option value="">待分配</option>
+                                    {% for u in user_list %}
+                                    <option value="{{ u.english }}" {% if ma and ma.assignee == u.english %}selected{% endif %}>
+                                        {{ u.display }} ({{ u.role }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% elif ma %}
+                                <span class="badge bg-secondary">{{ ma.assignee }}</span>
+                                {% else %}
+                                <span class="text-muted">待分配</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if stats.completed == stats.total %}
+                                <span class="text-success">✅</span>
+                                {% elif stats.completed > 0 %}
+                                <span class="text-warning">🔄</span>
+                                {% else %}
+                                <span class="text-muted">⏳</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-center py-4 text-muted">尚未上传Excel文件</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: File Management -->
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0">📎 附件</h6>
+            </div>
+            <div class="card-body">
+                {% if project.file_path %}
+                <p class="small"><strong>原始文件：</strong>{{ project.file_path.split('\\')[-1] }}</p>
+                {% if project.output_path %}
+                <p class="small"><strong>导出文件：</strong>{{ project.output_path.split('\\')[-1] }}</p>
+                {% endif %}
+
+                <div class="d-grid gap-2">
+                    {% if project.created_by == username %}
+                    <form method="POST" action="{{ url_for('upload.upload_excel', project_id=project.id) }}"
+                          enctype="multipart/form-data" class="border rounded p-2 bg-light">
+                        <small class="fw-bold">上传新版本（仅项目负责人）</small>
+                        <input type="file" name="file" accept=".xlsx,.xlsm" class="form-control form-control-sm mt-1 mb-2">
+                        <button type="submit" class="btn btn-sm btn-outline-primary w-100">📤 上传</button>
+                        <small class="text-muted">支持 .xlsx / .xlsm，≤16MB</small>
+                    </form>
+                    {% endif %}
+
+                    {% if project.file_path %}
+                    <a href="{{ url_for('export.export_result', project_id=project.id) }}"
+                       class="btn btn-outline-success">📥 导出审阅结果</a>
+                    {% endif %}
+
+                    {% if project.created_by == username %}
+                    <button class="btn btn-outline-danger btn-sm"
+                            onclick="deleteProject({{ project.id }}, '{{ project.name }}')">🗑 删除项目</button>
+                    {% endif %}
+                </div>
+                {% else %}
+                {% if project.created_by == username %}
+                <form method="POST" action="{{ url_for('upload.upload_excel', project_id=project.id) }}"
+                      enctype="multipart/form-data"
+                      class="border border-dashed rounded p-4 text-center"
+                      ondrop="return false" ondragover="return false">
+                    <i class="bi bi-cloud-upload" style="font-size: 2rem;"></i>
+                    <p class="mt-2 mb-1">拖拽或点击上传 Excel 文件</p>
+                    <small class="text-muted">支持 .xlsx / .xlsm，≤16MB</small>
+                    <input type="file" name="file" accept=".xlsx,.xlsm"
+                           class="form-control mt-2" required>
+                    <button type="submit" class="btn btn-primary btn-sm mt-2 w-100">📤 上传</button>
+                </form>
+                {% else %}
+                <div class="text-center py-3 text-muted">
+                    <small>尚未上传文件，请联系项目负责人</small>
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="d-grid gap-2">
+            <a href="{{ url_for('review.review_workspace', project_id=project.id) }}"
+               class="btn btn-primary {% if not project.file_path %}disabled{% endif %}">
+                📋 进入审阅工作台
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deleteProject(id, name) {
+    if (confirm(`确定要删除项目「${name}」吗？此操作将删除所有相关数据，不可恢复。`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/projects/${id}/delete`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Handle assign select changes
+document.querySelectorAll('.assign-select').forEach(sel => {
+    sel.addEventListener('change', function() {
+        const assignee = this.value;
+        const l1 = this.dataset.l1;
+        fetch(`/projects/{{ project.id }}/assign`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({module_l1: l1, assignee: assignee})
+        }).then(r => r.json()).then(data => {
+            if (data.ok) location.reload();
+            else alert(data.error || '分配失败');
+        });
+    });
+});
+</script>
+{% endblock %}

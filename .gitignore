@@ -1,0 +1,28 @@
+# Excel files
+*.xlsx
+*.xls
+*.xlsm
+
+# Database
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+~$*
+
+# Uploads and exports
+uploads/*
+!uploads/.gitkeep

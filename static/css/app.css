@@ -1,0 +1,539 @@
+/* ==================== Global ==================== */
+
+:root {
+    --blue: #1677FF;
+    --green: #36CFC9;
+    --yellow: #FFB800;
+    --purple: #722ED1;
+    --gray: #F2F3F5;
+    --gray-dark: #8C8C8C;
+    --bg-page: #F5F5F5;
+    --bg-card: #FFFFFF;
+    --bg-card-alt1: #FAFAFA;
+    --bg-card-alt2: #F5F5F5;
+    --border: #E8E8E8;
+    --text: #262626;
+    --text-secondary: #595959;
+    --radius: 6px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    background: var(--bg-page);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+h5, h6 { font-size: 16px; font-weight: 600; }
+small, .text-muted { font-size: 12px; color: var(--text-secondary); }
+
+/* ==================== Navbar ==================== */
+
+.navbar {
+    padding: 0.3rem 1rem;
+    background: var(--blue) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.navbar-brand {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* ==================== Cards ==================== */
+
+.card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    background: var(--bg-card);
+}
+
+.card-header {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+}
+
+.card-body { padding: 0.75rem; }
+
+.card-footer {
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    padding: 0.4rem 0.75rem;
+}
+
+.accordion-item {
+    border-radius: var(--radius) !important;
+    border: 1px solid var(--border);
+    margin-bottom: 12px !important;
+    overflow: hidden;
+}
+
+.accordion-button {
+    font-size: 13px;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-card);
+    border-radius: var(--radius) !important;
+}
+
+.accordion-button:not(.collapsed) {
+    background: #E6F0FF;
+    color: var(--blue);
+    box-shadow: none;
+}
+
+.accordion-button:focus {
+    box-shadow: none;
+    border-color: var(--blue);
+}
+
+/* Card backgrounds by type */
+.card-type-official { background: var(--bg-card); }
+.card-type-industry { background: var(--bg-card-alt1); }
+.card-type-internal { background: var(--bg-card-alt2); }
+
+/* ==================== Filter Bar ==================== */
+
+.filter-bar {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.4rem 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.filter-btn {
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.filter-btn:hover { border-color: var(--blue); color: var(--blue); }
+.filter-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+/* Toggle switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+}
+
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #ccc;
+    border-radius: 20px;
+    transition: 0.2s;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px; width: 14px;
+    left: 3px; bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+
+input:checked + .toggle-slider { background: var(--blue); }
+input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+/* ==================== Tree Sidebar ==================== */
+
+.module-tree {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.tree-toggle {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+
+.tree-toggle:hover { background: #F0F0F0; }
+
+.tree-l2-item {
+    display: block;
+    padding: 3px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+}
+
+.tree-l2-item:hover { background: #F5F5F5; color: var(--text); }
+
+.tree-l2-item.current {
+    background: #E6F0FF;
+    color: var(--blue);
+    border-left: 3px solid var(--blue);
+    font-weight: 500;
+}
+
+.risk-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* ==================== Status Buttons ==================== */
+
+.status-btn {
+    font-size: 12px;
+    padding: 3px 10px;
+    min-width: 52px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    opacity: 0.7;
+}
+
+.status-btn:hover, .status-btn.active { opacity: 1; box-shadow: 0 0 0 2px rgba(22,119,255,0.2); }
+
+.status-btn.status-pending  { color: var(--gray-dark); border-color: var(--border); }
+.status-btn.status-confirmed { color: #fff; background: var(--green); border-color: var(--green); }
+.status-btn.status-revise   { color: #fff; background: var(--yellow); border-color: var(--yellow); }
+.status-btn.status-discuss  { color: #fff; background: var(--purple); border-color: var(--purple); }
+
+.status-badge {
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* ==================== Content Cards ==================== */
+
+.content-panel {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.content-panel .panel-header {
+    background: #FAFAFA;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panel-meta { font-size: 11px; color: var(--text-secondary); font-weight: normal; }
+
+.content-panel .panel-body {
+    padding: 0.6rem 0.75rem;
+    max-height: 220px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* Long text auto-indent */
+.panel-body .auto-indent {
+    padding-left: 0;
+}
+
+/* Floating edit button */
+.float-edit-btn {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(22,119,255,0.3);
+    transition: transform 0.15s;
+    z-index: 5;
+}
+
+.float-edit-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(22,119,255,0.4);
+}
+
+/* ==================== Link List ==================== */
+
+.link-inline-block {
+    background: #FFFBE6;
+    border: 1px solid #FFE58F;
+    border-radius: 4px;
+    padding: 3px 8px;
+    margin: 2px 0;
+    font-size: 12px;
+}
+
+.link-inline-block a {
+    color: var(--blue);
+    word-break: break-all;
+}
+
+.link-status-select {
+    font-size: 10px;
+    padding: 1px 3px;
+    border-radius: 3px;
+    border: 1px solid #d9d9d9;
+}
+
+/* ==================== Editor ==================== */
+
+.editor-toolbar {
+    background: #FAFAFA;
+    border: 1px solid var(--border);
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 4px 8px;
+    display: flex;
+    gap: 4px;
+}
+
+.editor-toolbar button {
+    width: 28px; height: 28px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.editor-toolbar button:hover { border-color: var(--blue); color: var(--blue); }
+
+/* ==================== Scrollbar ==================== */
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d9d9d9; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #bfbfbf; }
+
+/* ==================== Progress ==================== */
+
+.progress {
+    height: 6px;
+    border-radius: 3px;
+    background: #F0F0F0;
+}
+
+.progress-bar { background: var(--blue); border-radius: 3px; }
+
+/* ==================== Breadcrumb ==================== */
+
+.breadcrumb-bar {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.breadcrumb-bar a { color: var(--text-secondary); text-decoration: none; }
+.breadcrumb-bar a:hover { color: var(--blue); }
+
+/* ==================== Buttons ==================== */
+
+.btn { border-radius: var(--radius); font-size: 13px; }
+.btn-sm { font-size: 12px; padding: 3px 10px; }
+.btn-primary { background: var(--blue); border-color: var(--blue); }
+.btn-primary:hover { background: #4096FF; border-color: #4096FF; }
+.btn-outline-secondary { color: var(--text-secondary); border-color: #d9d9d9; }
+.btn-outline-secondary:hover { color: var(--blue); border-color: var(--blue); background: #fff; }
+
+/* ==================== Tabs ==================== */
+
+.pair-tabs { border-bottom: 2px solid #E8E8E8; }
+
+.pair-tab {
+    border: none;
+    background: none;
+    padding: 4px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #8C8C8C;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+}
+
+.pair-tab:hover { color: #1677FF; }
+.pair-tab.active { color: #1677FF; border-bottom-color: #1677FF; }
+
+/* ==================== Panels ==================== */
+
+.content-panel {
+    background: #fff;
+    border: 1px solid #E8E8E8;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: #FAFAFA;
+    border-bottom: 1px solid #E8E8E8;
+    font-size: 13px;
+}
+
+.panel-body {
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow: hidden;
+}
+
+.panel-footer {
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+    background: #FAFAFA;
+    border-top: 1px solid #E8E8E8;
+    min-height: 32px;
+}
+
+.formatted-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+/* ==================== Edit Buttons ==================== */
+
+.float-edit-btn-sm {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid #1677FF;
+    background: #fff;
+    color: #1677FF;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.float-edit-btn-sm:hover {
+    background: #1677FF;
+    color: #fff;
+}
+
+.btn-edit-panel { transition: all 0.15s; }
+
+/* ==================== Inline Editor ==================== */
+
+.content-edit { padding: 0; }
+
+.editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+    background: #FAFAFA;
+    border-bottom: 1px solid #E8E8E8;
+}
+
+.et-btn {
+    height: 28px;
+    padding: 0 18px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.et-btn b, .et-btn s { display: inline-block; width: 14px; text-align: center; font-size: 13px; }
+
+.et-btn:hover { border-color: #1677FF; color: #1677FF; }
+
+.btn-save { background: #1677FF; color: #fff; border-color: #1677FF; }
+.btn-save:hover { background: #4096FF; border-color: #4096FF; color: #fff; }
+
+.quill-inline { border: none; }
+
+/* ==================== Reference Links ==================== */
+
+.ref-link-inline {
+    display: block;
+    background: #FFFBE6;
+    border: 1px solid #FFE58F;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin: 2px 0;
+    font-size: 12px;
+}
+
+.ref-url-link { color: #1677FF; word-break: break-all; }
+
+.link-status-select { font-size: 10px; padding: 1px; border-radius: 3px; border: 1px solid #d9d9d9; }
+.corrected-link-input { font-size: 10px; padding: 1px 4px; border-radius: 3px; border: 1px solid #d9d9d9; }
+
+/* ==================== Scope Bar ==================== */
+
+.scope-bar {
+    background: #fff;
+    border: 1px solid #E8E8E8;
+    border-left: 3px solid #1677FF;
+    border-radius: 4px;
+    padding: 6px 10px;
+}
+
+/* ==================== Responsive ==================== */
+
+@media (max-width: 768px) {
+    .col-md-3 { display: none; }
+}
+
+/* ==================== Badges ==================== */
+
+.badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+}

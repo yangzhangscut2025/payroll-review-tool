@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}项目列表 - 薪酬合规审阅工具{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-folder2-open"></i> 项目列表</h4>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+        <i class="bi bi-plus-lg"></i> 新建项目
+    </button>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <form method="GET" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <label class="col-form-label col-form-label-sm"><i class="bi bi-search"></i></label>
+            </div>
+            <div class="col-md-3">
+                <input type="text" name="country" class="form-control form-control-sm"
+                       placeholder="搜索国家..." value="{{ country_filter }}">
+            </div>
+            <div class="col-auto">
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">全部</option>
+                    <option value="进行中" {% if status_filter == '进行中' %}selected{% endif %}>进行中</option>
+                    <option value="已完成" {% if status_filter == '已完成' %}selected{% endif %}>已完成</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">筛选</button>
+                <a href="{{ url_for('projects.project_list') }}" class="btn btn-sm btn-outline-secondary">重置</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+{% if projects %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>项目名称</th>
+                <th>国家</th>
+                <th>负责人</th>
+                <th>进度</th>
+                <th>状态</th>
+                <th>最后更新</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in projects %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('projects.project_detail', project_id=p.id) }}"
+                       class="text-decoration-none fw-medium">{{ p.name }}</a>
+                </td>
+                <td>{{ p.country }}</td>
+                <td>{{ p.created_by }}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="progress flex-grow-1 me-1" style="height: 6px; min-width: 60px;">
+                            {% set pct = (p.completed_modules / p.total_modules * 100) if p.total_modules > 0 else 0 %}
+                            <div class="progress-bar {% if pct == 100 %}bg-success{% endif %}"
+                                 style="width: {{ pct|int }}%"></div>
+                        </div>
+                        <small class="text-muted">{{ p.completed_modules }}/{{ p.total_modules }}</small>
+                    </div>
+                </td>
+                <td>
+                    {% if p.status == '已完成' %}
+                    <span class="badge bg-success">✅ 已完成</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">🔄 进行中</span>
+                    {% endif %}
+                </td>
+                <td><small>{{ p.updated_at.strftime('%Y-%m-%d %H:%M') if p.updated_at else '-' }}</small></td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('projects.project_detail', project_id=p.id) }}"
+                           class="btn btn-outline-primary" title="详情">📝</a>
+                        <a href="{{ url_for('review.review_workspace', project_id=p.id) }}"
+                           class="btn btn-outline-success" title="进入审阅">📋</a>
+                        {% if p.file_path %}
+                        <a href="{{ url_for('export.export_result', project_id=p.id) }}"
+                           class="btn btn-outline-info" title="导出">📥</a>
+                        {% endif %}
+                        {% if p.created_by == username %}
+                        <button class="btn btn-outline-danger" title="删除"
+                                onclick="deleteProject({{ p.id }}, '{{ p.name }}')">🗑</button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+    <p class="mt-2">暂无项目，点击「新建项目」开始</p>
+</div>
+{% endif %}
+
+<p class="text-muted small">共 {{ projects|length }} 个项目</p>
+
+<!-- Create Project Modal -->
+<div class="modal fade" id="createModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('projects.create_project') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 新建项目</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">文件名称 <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control"
+                               placeholder="如：荷兰_2026H2" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">国家 <span class="text-danger">*</span></label>
+                        <input type="text" name="country" class="form-control"
+                               placeholder="如：荷兰" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">创建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deleteProject(id, name) {
+    if (confirm(`确定要删除项目「${name}」吗？此操作将删除所有相关数据，不可恢复。`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/projects/${id}/delete`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

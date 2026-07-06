@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}登录 - 薪酬合规审阅工具{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5 pt-3">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4 text-center">
+                <h5 class="mb-1">薪酬合规审阅工具</h5>
+                <p class="text-muted small mb-3">请输入您的姓名</p>
+
+                {% if error %}
+                <div class="alert alert-danger py-2 small">{{ error }}</div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('auth.login') }}">
+                    <div class="mb-3">
+                        <input type="text" name="username" class="form-control"
+                               placeholder="输入英文名或中文名" required autofocus
+                               list="userList" autocomplete="off">
+                        <datalist id="userList">
+                            {% for u in users %}
+                            <option value="{{ u.english }}">{{ u.chinese }} — {{ u.role }}</option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">进入工具</button>
+                </form>
+
+                <div class="mt-3 text-start small text-muted">
+                    <div class="fw-semibold mb-1">可用账号：</div>
+                    <div class="row">
+                        {% for u in users %}
+                        <div class="col-6">
+                            <span class="text-dark">{{ u.english }}</span>
+                            <span class="ms-1">{{ u.chinese }}</span>
+                            <span class="badge bg-light text-muted" style="font-size:10px;">{{ u.role }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
