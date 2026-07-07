@@ -89,6 +89,18 @@ function renderRefText(el) {
     el.innerHTML = html;
 }
 
+function extractUrlsForRef(text) {
+    if (!text) return [];
+    var matches = text.match(/https?:\/\/[^\s<>"'\\)\\]]+/g) || [];
+    var seen = {};
+    var unique = [];
+    for (var i = 0; i < matches.length; i++) {
+        var u = matches[i].replace(/[.,;:!?]+$/, '');
+        if (!seen[u]) { seen[u] = true; unique.push(u); }
+    }
+    return unique;
+}
+
 function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escapeAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -292,6 +304,29 @@ async function saveEdit() {
             document.getElementById(d.editId).style.display = 'none';
             var viewDiv = document.getElementById(d.viewId).querySelector('.formatted-text');
             if (viewDiv) viewDiv.innerHTML = html;
+
+            // Update edit button data for toggle
+            var editBtn = document.querySelector('.btn-edit-panel[data-field-id="' + d.fieldId + '"][data-panel-type="' + d.panelType + '"]');
+            if (editBtn) {
+                editBtn.setAttribute('data-changed', html);
+                if (d.panelType === 'reference') {
+                    var plainText = html.replace(/<[^>]*>/g, '');
+                    editBtn.setAttribute('data-original', plainText);
+                }
+            }
+
+            // For reference: update link data and re-render
+            if (d.panelType === 'reference') {
+                var refEl = document.getElementById(d.viewId).querySelector('.ref-text');
+                if (refEl) {
+                    var plainText = html.replace(/<[^>]*>/g, '');
+                    refEl.setAttribute('data-original', plainText);
+                    var newUrls = extractUrlsForRef(plainText);
+                    refEl.setAttribute('data-urls', JSON.stringify(newUrls));
+                    renderRefText(refEl);
+                }
+            }
+
             var toggleBtn = document.getElementById('toggleBtn' + d.fieldId);
             if (toggleBtn) toggleBtn.style.display = '';
             activeQuill = null;
