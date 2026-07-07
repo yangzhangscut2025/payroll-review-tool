@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}溯源 - {{ project.name }}{% endblock %}
+{% block content %}
+
+<nav class="breadcrumb-bar d-flex justify-content-between align-items-center mb-2 px-1">
+    <div>
+        <a href="{{ url_for('review.review_workspace', project_id=project.id, l2=l2_index) }}" class="me-2 text-decoration-none">← 返回审阅</a>
+        <span class="fw-semibold">{{ project.name }}</span>
+        <span class="mx-1">/</span>
+        <span>{{ current.l1 }}</span>
+        <span class="mx-1">/</span>
+        <span class="text-primary fw-medium">{{ current.l2 }}</span>
+    </div>
+    <div>
+        <a href="{{ url_for('review.review_workspace', project_id=project.id, l2=l2_index+1) }}"
+           class="btn btn-outline-primary btn-sm {% if l2_index >= l2_list|length - 1 %}disabled{% endif %}">下一模块 ▶</a>
+    </div>
+</nav>
+
+{% if not md_dir_exists %}
+<div class="alert alert-warning">离线页面文件目录不存在，请确认已将 MD/HTML 文件放置在项目文件夹中。</div>
+{% elif not trace_results %}
+<div class="alert alert-info">当前模块暂无溯源结果。</div>
+{% else %}
+
+{% for r in trace_results %}
+<div class="card mb-3">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <strong>{{ r.field_type }}</strong>
+        <small class="text-muted">对照依据：{{ r.ref_type }}</small>
+    </div>
+    <div class="card-body p-2">
+        {% for s in r.sentences %}
+        {% set all_found = s.keywords and s.keywords|length > 0 and s.keywords|selectattr('found')|list|length == s.keywords|length %}
+        {% set none_found = s.keywords and s.keywords|length > 0 and s.keywords|selectattr('found')|list|length == 0 %}
+        {% set no_kw = s.keywords|length == 0 %}
+        <div class="border rounded p-2 mb-2" style="border-left: 3px solid {{ '#722ED1' if none_found else ('#8C8C8C' if no_kw else '#36CFC9') }};">
+            <div class="mb-1">{{ s.sentence }}</div>
+            {% if no_kw %}
+            <span class="badge bg-secondary" style="font-size:10px;">无关键数据</span>
+            <small class="text-muted">缺少数字/日期，需人工判断</small>
+            {% else %}
+            <span class="badge mb-2" style="font-size:10px; background:{{ '#722ED1' if none_found else '#36CFC9' }}; color:#fff;">
+                {{ '很可能无源' if none_found else '有匹配' }}
+            </span>
+            {% for kw in s.keywords %}
+            <div class="ms-3 mt-1 small">
+                {{ '✅' if kw.found else '❌' }}
+                <code>{{ kw.kw }}</code>
+                {% if kw.found %}
+                <span class="text-muted">（{{ kw.hits|length }} 文件匹配）</span>
+                {% set collapse_id = 'hit_{}_{}'.format(loop.parent.loop.index0, loop.index0) %}
+                <a href="#" onclick="var el=document.getElementById('{{ collapse_id }}');el.style.display=el.style.display==='none'?'':'none';return false;"
+                   class="text-primary" style="font-size:11px;">展开</a>
+                <div id="{{ collapse_id }}" style="display:none;">
+                    {% for hit in kw.hits %}
+                    <div class="border-start border-2 ps-2 mb-1 mt-1" style="font-size:10px;">
+                        <span class="text-primary fw-medium">{{ hit.file }}</span>
+                        {% for ctx in hit.contexts %}
+                        <div class="text-muted mt-1">{{ ctx }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+{% endif %}
+{% endblock %}
