@@ -23,12 +23,9 @@ def trace_page(project_id):
     if not project.file_path:
         return "请先上传Excel", 400
 
-    # 定位 MD 文件夹：优先用项目名在项目根目录下找
-    import config
-    md_dir = os.path.join(config.BASE_DIR, project.name)
-    if not os.path.isdir(md_dir):
-        base_name = os.path.splitext(os.path.basename(project.file_path))[0]
-        md_dir = os.path.join(os.path.dirname(project.file_path), base_name)
+    # 定位 MD 文件夹：和上传的 Excel 同目录同名
+    base_name = os.path.splitext(os.path.basename(project.file_path))[0]
+    md_dir = os.path.join(os.path.dirname(project.file_path), base_name)
     if not os.path.isdir(md_dir):
         md_dir = ''
 

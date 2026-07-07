@@ -26,4 +26,3 @@ Thumbs.db
 # Uploads and exports
 uploads/*
 !uploads/.gitkeep
-Payroll_Practical_Handbook_*
