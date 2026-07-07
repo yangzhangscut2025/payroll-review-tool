@@ -34,14 +34,14 @@
         {% set all_found = s.keywords and s.keywords|length > 0 and s.keywords|selectattr('found')|list|length == s.keywords|length %}
         {% set none_found = s.keywords and s.keywords|length > 0 and s.keywords|selectattr('found')|list|length == 0 %}
         {% set no_kw = s.keywords|length == 0 %}
-        <div class="border rounded p-2 mb-2" style="border-left: 3px solid {{ '#722ED1' if none_found else ('#8C8C8C' if no_kw else '#36CFC9') }};">
+        <div class="border rounded p-2 mb-2" style="border-left: 3px solid {{ '#722ED1' if none_found else ('#8C8C8C' if no_kw else ('#36CFC9' if all_found else '#FFB800')) }};">
             <div class="mb-1">{{ s.sentence }}</div>
             {% if no_kw %}
             <span class="badge bg-secondary" style="font-size:10px;">无关键数据</span>
             <small class="text-muted">缺少数字/日期，需人工判断</small>
             {% else %}
-            <span class="badge mb-2" style="font-size:10px; background:{{ '#722ED1' if none_found else '#36CFC9' }}; color:#fff;">
-                {{ '很可能无源' if none_found else '有匹配' }}
+            <span class="badge mb-2" style="font-size:10px; background:{{ '#722ED1' if none_found else ('#36CFC9' if all_found else '#FFB800') }}; color:#fff;">
+                {{ '很可能无源' if none_found else ('全部有源' if all_found else '部分有源') }}
             </span>
             {% for kw in s.keywords %}
             <div class="ms-3 mt-1 small">
@@ -49,7 +49,7 @@
                 <code>{{ kw.kw }}</code>
                 {% if kw.found %}
                 <span class="text-muted">（{{ kw.hits|length }} 文件匹配）</span>
-                {% set collapse_id = 'hit_{}_{}'.format(loop.parent.index0, loop.index0) %}
+                {% set collapse_id = 'hit_{}_{}_{}'.format(loop.parent.parent.index0, loop.parent.index0, loop.index0) %}
                 <a href="#" onclick="var el=document.getElementById('{{ collapse_id }}');el.style.display=el.style.display==='none'?'':'none';return false;"
                    class="text-primary" style="font-size:11px;">展开</a>
                 <div id="{{ collapse_id }}" style="display:none;">
