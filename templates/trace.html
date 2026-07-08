@@ -11,66 +11,154 @@
         <span class="mx-1">/</span>
         <span class="text-primary fw-medium">{{ current.l2 }}</span>
     </div>
-    <div>
+    <div class="d-flex gap-2">
+        {% if not index_ready %}
+        <button class="btn btn-sm btn-outline-primary" onclick="buildIndex({{ project.id }})">构建索引</button>
+        {% endif %}
         <a href="{{ url_for('review.review_workspace', project_id=project.id, l2=l2_index+1) }}"
            class="btn btn-outline-primary btn-sm {% if l2_index >= l2_list|length - 1 %}disabled{% endif %}">下一模块 ▶</a>
     </div>
 </nav>
 
 {% if not md_dir_exists %}
-<div class="alert alert-warning">离线页面文件目录不存在，请确认已将 MD/HTML 文件放置在项目文件夹中。</div>
-{% elif not trace_results %}
-<div class="alert alert-info">当前模块暂无溯源结果。</div>
+<div class="alert alert-warning">离线页面文件目录不存在，请确认已将 MD 文件放置在 uploads/project_X/ 中。</div>
 {% else %}
 
-{% for r in trace_results %}
-<div class="card mb-3">
-    <div class="card-header py-2 d-flex justify-content-between align-items-center">
-        <strong>{{ r.field_type }}</strong>
-        <small class="text-muted">对照依据：{{ r.ref_type }}</small>
-    </div>
-    <div class="card-body p-2">
-        {% for s in r.sentences %}
-        {% set all_found = s.keywords and s.keywords|length > 0 and s.keywords|selectattr('found')|list|length == s.keywords|length %}
-        {% set none_found = s.keywords and s.keywords|length > 0 and s.keywords|selectattr('found')|list|length == 0 %}
-        {% set no_kw = s.keywords|length == 0 %}
-        <div class="border rounded p-2 mb-2" style="border-left: 3px solid {{ '#722ED1' if none_found else ('#8C8C8C' if no_kw else ('#36CFC9' if all_found else '#FFB800')) }};">
-            <div class="mb-1">{{ s.sentence }}</div>
-            {% if no_kw %}
-            <span class="badge bg-secondary" style="font-size:10px;">无关键数据</span>
-            <small class="text-muted">缺少数字/日期，需人工判断</small>
-            {% else %}
-            <span class="badge mb-2" style="font-size:10px; background:{{ '#722ED1' if none_found else ('#36CFC9' if all_found else '#FFB800') }}; color:#fff;">
-                {{ '很可能无源' if none_found else ('全部有源' if all_found else '部分有源') }}
-            </span>
-            {% for kw in s.keywords %}
-            <div class="ms-3 mt-1 small">
-                {{ '✅' if kw.found else '❌' }}
-                <code>{{ kw.kw }}</code>
-                {% if kw.found %}
-                <span class="text-muted">（{{ kw.hits|length }} 文件匹配）</span>
-                {% set collapse_id = 'hit_{}_{}_{}'.format(loop.parent.parent.index0, loop.parent.index0, loop.index0) %}
-                <a href="#" onclick="var el=document.getElementById('{{ collapse_id }}');el.style.display=el.style.display==='none'?'':'none';return false;"
-                   class="text-primary" style="font-size:11px;">展开</a>
-                <div id="{{ collapse_id }}" style="display:none;">
-                    {% for hit in kw.hits %}
-                    <div class="border-start border-2 ps-2 mb-1 mt-1" style="font-size:10px;">
-                        <span class="text-primary fw-medium">{{ hit.file }}</span>
-                        {% for ctx in hit.contexts %}
-                        <div class="text-muted mt-1">{{ ctx }}</div>
+<div class="row g-2">
+    <!-- Left: Content + Keyword matches -->
+    <div class="col-md-6">
+        {% if not index_ready %}
+        <div class="alert alert-info small py-1">点击「构建索引」创建向量检索库（首次需 2-5 分钟）。</div>
+        {% endif %}
+
+        {% for r in trace_results %}
+        <div class="card mb-3">
+            <div class="card-header py-2">
+                <strong>{{ r.field_type }}</strong>
+                <small class="text-muted ms-2">对照：{{ r.ref_type }}</small>
+            </div>
+            <div class="card-body p-2" style="max-height:60vh;overflow-y:auto;">
+                {% for s in r.sentences %}
+                {% set has_match = s.keywords and s.keywords|selectattr('found')|list|length > 0 %}
+                <div class="mb-2 p-2 border rounded sentence-row"
+                     style="border-left:3px solid {{ '#36CFC9' if has_match else '#E8E8E8' }};cursor:pointer;"
+                     onclick="vectorSearch(this, '{{ s.sentence|e }}')">
+                    <div class="small">{{ s.sentence }}</div>
+                    {% if has_match %}
+                    <div class="mt-1">
+                        {% for kw in s.keywords if kw.found %}
+                        <span class="badge bg-success me-1" style="font-size:10px;">✅ {{ kw.kw }}</span>
                         {% endfor %}
                     </div>
-                    {% endfor %}
+                    {% endif %}
                 </div>
-                {% endif %}
+                {% endfor %}
             </div>
-            {% endfor %}
-            {% endif %}
         </div>
         {% endfor %}
     </div>
+
+    <!-- Right: Search Results + MD Viewer -->
+    <div class="col-md-6">
+        <div class="card mb-2">
+            <div class="card-header py-2 d-flex justify-content-between">
+                <strong>检索结果</strong>
+                <small class="text-muted" id="searchLabel">点击左侧语句搜索</small>
+            </div>
+            <div class="card-body p-2" id="searchResults" style="max-height:35vh;overflow-y:auto;">
+                <div class="text-center py-3 text-muted small">点击左侧语句进行向量检索</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header py-2">
+                <strong>信息源文件</strong>
+                <small class="text-muted ms-2" id="viewerLabel">点击文件查看</small>
+            </div>
+            <div class="card-body p-2" style="max-height:20vh;overflow-y:auto;">
+                {% for ref_type, files in md_files.items() %}
+                <div class="mb-1"><small class="fw-semibold">{{ ref_type }}</small></div>
+                {% for fname in files %}
+                <a href="#" onclick="loadMdFile('{{ fname }}');return false;"
+                   class="d-block py-1 px-2 small text-primary border-bottom"
+                   style="font-size:11px;text-decoration:none;">{{ fname }}</a>
+                {% endfor %}
+                {% endfor %}
+            </div>
+            <div class="card-body p-2" id="mdViewer" style="max-height:30vh;overflow-y:auto;font-size:12px;white-space:pre-wrap;">
+                <div class="text-center py-4 text-muted small">点击上方文件查看 MD 内容</div>
+            </div>
+        </div>
+    </div>
 </div>
-{% endfor %}
 
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const MD_DIR = "{{ md_dir|e }}";
+    const PROJECT_ID = {{ project.id }};
+
+    async function buildIndex(pid) {
+        var btn = event.target;
+        btn.textContent = '构建中…'; btn.disabled = true;
+        try {
+            var r = await fetch('/api/projects/' + pid + '/build-index');
+            var d = await r.json();
+            if (d.ok) { alert('索引构建完成！共 ' + d.blocks + ' 个段落块'); location.reload(); }
+            else { alert('构建失败：' + (d.error || '未知错误')); }
+        } catch(e) { alert('构建失败：' + e.message); }
+        btn.textContent = '构建索引'; btn.disabled = false;
+    }
+
+    async function vectorSearch(row, query) {
+        var resultsDiv = document.getElementById('searchResults');
+        var label = document.getElementById('searchLabel');
+        resultsDiv.innerHTML = '<div class="text-center py-3 text-muted small">检索中…</div>';
+        label.textContent = '检索中…';
+        document.querySelectorAll('.sentence-row').forEach(function(r) { r.style.background = ''; });
+        row.style.background = '#E6F0FF';
+        try {
+            var r = await fetch('/api/vector-search?project_id=' + PROJECT_ID + '&q=' + encodeURIComponent(query) + '&top_k=5');
+            var d = await r.json();
+            var html = '';
+            if (d.results.length === 0) {
+                html = '<div class="text-center py-3 text-muted small">未找到匹配结果（索引可能未构建）</div>';
+            }
+            for (var i = 0; i < d.results.length; i++) {
+                var hit = d.results[i];
+                var score = (1 - hit.distance).toFixed(2);
+                var scoreColor = score > 0.7 ? '#36CFC9' : (score > 0.5 ? '#FFB800' : '#8C8C8C');
+                html += '<div class="border rounded p-2 mb-2" style="font-size:12px;">';
+                html += '<div class="d-flex justify-content-between mb-1">';
+                html += '<a href="#" onclick="loadMdFile(\'' + hit.file + '\');return false;" class="text-primary small">' + hit.file + '</a>';
+                html += '<span class="badge" style="background:' + scoreColor + ';color:#fff;font-size:10px;">' + score + '</span>';
+                html += '</div>';
+                html += '<div class="text-muted small" style="white-space:pre-wrap;">' + hit.doc.substring(0, 300) + '</div>';
+                html += '</div>';
+            }
+            resultsDiv.innerHTML = html;
+            label.textContent = d.results.length + ' 条结果';
+        } catch(e) {
+            resultsDiv.innerHTML = '<div class="text-danger small">检索失败</div>';
+            label.textContent = '错误';
+        }
+    }
+
+    function loadMdFile(fileName) {
+        var viewer = document.getElementById('mdViewer');
+        var label = document.getElementById('viewerLabel');
+        viewer.innerHTML = '<div class="text-center py-3 text-muted small">加载中…</div>';
+        label.textContent = fileName;
+        var path = encodeURIComponent(MD_DIR + '/' + fileName);
+        fetch('/api/md-content?path=' + path)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.error) { viewer.innerHTML = '<div class="text-danger">' + d.error + '</div>'; return; }
+                viewer.innerHTML = d.content.replace(/\n/g, '<br>');
+            })
+            .catch(function(e) { viewer.innerHTML = '<div class="text-danger">加载失败</div>'; });
+    }
+</script>
 {% endblock %}
