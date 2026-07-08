@@ -3,7 +3,7 @@ import os
 from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify
 from models import db, Project, ReviewField
 from keyword_checker import trace_one_field
-from vector_search import search_similar, build_index, index_exists
+from vector_search import search_similar, build_index, index_exists, build_progress
 
 trace_bp = Blueprint('trace', __name__)
 
@@ -48,7 +48,8 @@ def trace_page(project_id):
     trace_results = []
     if md_dir:
         l2_fields = [f for f in fields
-                     if f.module_l1 == current['l1'] and f.module_l2 == current['l2']]
+                     if f.module_l1 == current['l1'] and f.module_l2 == current['l2']
+                     and '实务内容' in f.field_type]
         for field in l2_fields:
             ref_type = TRACE_MAP.get(field.field_type)
             if not ref_type or not (field.original_content or '').strip():
@@ -98,6 +99,12 @@ def build_index_api(project_id):
         return jsonify({'ok': True, 'blocks': count})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@trace_bp.route('/api/projects/<int:project_id>/build-progress')
+def build_progress_api(project_id):
+    """查询构建进度。"""
+    return jsonify({'progress': build_progress(project_id)})
 
 
 @trace_bp.route('/api/vector-search')

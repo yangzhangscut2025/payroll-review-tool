@@ -102,14 +102,24 @@
 
     async function buildIndex(pid) {
         var btn = event.target;
-        btn.textContent = '构建中…'; btn.disabled = true;
-        try {
-            var r = await fetch('/api/projects/' + pid + '/build-index');
-            var d = await r.json();
-            if (d.ok) { alert('索引构建完成！共 ' + d.blocks + ' 个段落块'); location.reload(); }
-            else { alert('构建失败：' + (d.error || '未知错误')); }
-        } catch(e) { alert('构建失败：' + e.message); }
-        btn.textContent = '构建索引'; btn.disabled = false;
+        btn.textContent = '加载模型…'; btn.disabled = true;
+
+        // Start build
+        fetch('/api/projects/' + pid + '/build-index').catch(function(){});
+
+        // Poll progress
+        var poll = setInterval(async function() {
+            try {
+                var r = await fetch('/api/projects/' + pid + '/build-progress');
+                var d = await r.json();
+                btn.textContent = d.progress || '构建中…';
+                if (d.progress && d.progress.indexOf('完成') === 0) {
+                    clearInterval(poll);
+                    btn.textContent = '✓ 完成';
+                    setTimeout(function() { location.reload(); }, 1000);
+                }
+            } catch(e) { btn.textContent = '构建中…'; }
+        }, 2000);
     }
 
     async function vectorSearch(row, query) {

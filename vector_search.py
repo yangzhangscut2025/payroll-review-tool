@@ -83,7 +83,17 @@ def build_index(md_dir, project_id):
     idx = 0
 
     md_files = sorted([f for f in os.listdir(md_dir) if f.endswith('.md')])
-    for fname in md_files:
+    total_files = len(md_files)
+
+    # 进度文件
+    progress_file = os.path.join(DB_DIR, f'build_progress_{project_id}.txt')
+    def write_progress(msg):
+        with open(progress_file, 'w', encoding='utf-8') as f:
+            f.write(msg)
+
+    write_progress(f'0/{total_files} 文件')
+
+    for fi, fname in enumerate(md_files):
         path = os.path.join(md_dir, fname)
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -98,18 +108,18 @@ def build_index(md_dir, project_id):
             metas.append({'file': fname, 'chunk_idx': i, 'row': int(fname.split('_')[0]) if fname[0].isdigit() else 0})
             idx += 1
 
-            # 分批嵌入（每 500 条一批）
             if len(ids) >= 500:
-                print(f'  Embedding batch {idx-len(ids)+1}-{idx}...', file=sys.stderr)
                 embeddings = model.encode(docs, show_progress_bar=False).tolist()
                 coll.add(ids=ids, documents=docs, metadatas=metas, embeddings=embeddings)
                 ids, docs, metas = [], [], []
 
-    # 最后一批
+        write_progress(f'{fi+1}/{total_files} 文件, {idx} 段落')
+
     if ids:
         embeddings = model.encode(docs, show_progress_bar=False).tolist()
         coll.add(ids=ids, documents=docs, metadatas=metas, embeddings=embeddings)
 
+    write_progress(f'完成: {total_files} 文件, {idx} 段落')
     return idx
 
 
@@ -151,3 +161,12 @@ def index_exists(project_id):
         return True
     except Exception:
         return False
+
+
+def build_progress(project_id):
+    """读取构建进度。"""
+    progress_file = os.path.join(DB_DIR, f'build_progress_{project_id}.txt')
+    if os.path.exists(progress_file):
+        with open(progress_file, 'r', encoding='utf-8') as f:
+            return f.read().strip()
+    return ''
