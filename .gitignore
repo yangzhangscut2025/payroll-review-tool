@@ -19,11 +19,16 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Temp files
+# Personal notes
+# Personal notes
+项目复盘.md
+向量检索踩坑记录.md
+开发手册.md
+服务器注意事项.md
 *.tmp
 ~$*
 
 # Uploads and exports
 uploads/*
 !uploads/.gitkeep
-项目复盘.md
+vectordb/
