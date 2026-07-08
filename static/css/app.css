@@ -254,7 +254,7 @@ input:checked + .toggle-slider:before { transform: translateX(16px); }
 
 .content-panel .panel-body {
     padding: 0.6rem 0.75rem;
-    max-height: 400px;
+    max-height: 220px;
     overflow-y: auto;
     font-size: 13px;
     line-height: 1.6;
@@ -433,7 +433,7 @@ input:checked + .toggle-slider:before { transform: translateX(16px); }
 .formatted-text {
     white-space: pre-wrap;
     word-break: break-word;
-    max-height: 400px;
+    max-height: 220px;
     overflow-y: auto;
 }
 
