@@ -50,7 +50,15 @@ def trace_page(project_id):
         l2_fields = [f for f in fields
                      if f.module_l1 == current['l1'] and f.module_l2 == current['l2']
                      and '实务内容' in f.field_type]
-        for field in l2_fields:
+        # 去重（同一 row_index + field_type 只取第一条）
+        seen_fields = set()
+        deduped = []
+        for f in l2_fields:
+            key = (f.row_index, f.field_type)
+            if key not in seen_fields:
+                seen_fields.add(key)
+                deduped.append(f)
+        for field in deduped:
             ref_type = TRACE_MAP.get(field.field_type)
             if not ref_type or not (field.original_content or '').strip():
                 continue
