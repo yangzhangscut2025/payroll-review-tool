@@ -18,6 +18,7 @@ def create_app():
     from routes.assign import assign_bp
     from routes.review import review_bp
     from routes.export import export_bp
+    from routes.trace import trace_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(projects_bp)
@@ -25,10 +26,11 @@ def create_app():
     app.register_blueprint(assign_bp)
     app.register_blueprint(review_bp)
     app.register_blueprint(export_bp)
+    app.register_blueprint(trace_bp)
 
     return app
 
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=5001, debug=True, use_reloader=False)

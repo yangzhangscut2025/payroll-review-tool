@@ -33,7 +33,7 @@ async function fetchWithRetry(url, options, maxRetries) {
 function createQuill(selector, content) {
     var ColorStyle = Quill.import('attributors/style/color');
     if (!ColorStyle.whitelist || ColorStyle.whitelist.indexOf('#C00000') === -1) {
-        ColorStyle.whitelist = ['red','green','blue','#C00000','#c00000','#548235','#548235','#2E75B5','#2e75b5','#F0F0F0','#FFC000','#5B9BD5'];
+        ColorStyle.whitelist = ['red','green','blue','#C00000','#c00000','#548235','#548235','#2E75B5','#2e75b5','#F0F0F0','#ffb700','#722ed1'];
         Quill.register(ColorStyle, true);
     }
     var q = new Quill(selector, { theme: 'snow', modules: { toolbar: false } });

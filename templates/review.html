@@ -16,8 +16,10 @@
         <small class="ms-2 text-muted">校验人: <strong>{{ assigned_map.get(current_l1).assignee if assigned_map.get(current_l1) else '待分配' }}</strong></small>
     </div>
     <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('trace.trace_page', project_id=project.id, l2=l2_index) }}" target="_blank"
+           class="btn btn-sm btn-outline-primary py-0" style="font-size:11px;">溯源</a>
         {% set is_mine = (assigned_map.get(current_l1) and assigned_map[current_l1].assignee == username) or project.created_by == username %}
-        <span class="badge" style="background:{{ '#36CFC9' if is_mine else '#FFB800' }};color:#fff;font-size:11px;">
+        <span class="badge" style="background:{{ '#36cf5066' if is_mine else '#ffb70045' }};color:#fff;font-size:11px;">
             {{ '我的模块' if is_mine else '只读' }}
         </span>
         <span class="ms-2 text-success small" id="saveStatus" style="display:none;">已保存</span>
@@ -93,7 +95,7 @@
                         <span class="fw-semibold small">{{ pair_data.content.field_type if pair_data.content else '-' }}</span>
                         {% if pair_data.content %}
                         {% set cst = pair_data.content.status %}
-                        <span class="badge" style="background:{{ {'待审阅':'#F2F3F5','已确认':'#36CFC9','需修改':'#FFB800','待讨论':'#722ED1'}.get(cst,'#ccc') }};color:{{ '#262626' if cst=='待审阅' else '#fff' }};font-size:11px;">{{ cst }}</span>
+                        <span class="badge" style="background:{{ {'待审阅':'#F2F3F5','已确认':'#36cf5066','需修改':'#ffb70045','待讨论':'#722ed1a5'}.get(cst,'#ccc') }};color:{{ '#262626' if cst=='待审阅' else '#fff' }};font-size:11px;">{{ cst }}</span>
                         {% endif %}
                     </div>
                     <div class="d-flex align-items-center gap-1">
@@ -161,7 +163,7 @@
                         <span class="fw-semibold small">{{ pair_data.reference.field_type if pair_data.reference else '-' }}</span>
                         {% if pair_data.reference %}
                         {% set rst = pair_data.reference.status %}
-                        <span class="badge" style="background:{{ {'待审阅':'#F2F3F5','已确认':'#36CFC9','需修改':'#FFB800','待讨论':'#722ED1'}.get(rst,'#ccc') }};color:{{ '#262626' if rst=='待审阅' else '#fff' }};font-size:11px;">{{ rst }}</span>
+                        <span class="badge" style="background:{{ {'待审阅':'#F2F3F5','已确认':'#36cf5066','需修改':'#ffb70045','待讨论':'#722ed1a5'}.get(rst,'#ccc') }};color:{{ '#262626' if rst=='待审阅' else '#fff' }};font-size:11px;">{{ rst }}</span>
                         {% endif %}
                     </div>
                     <div class="d-flex align-items-center gap-1">
