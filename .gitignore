@@ -26,3 +26,4 @@ Thumbs.db
 # Uploads and exports
 uploads/*
 !uploads/.gitkeep
+项目复盘.md
