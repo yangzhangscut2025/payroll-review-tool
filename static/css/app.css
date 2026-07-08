@@ -498,8 +498,8 @@ input:checked + .toggle-slider:before { transform: translateX(16px); }
 
 .et-btn:hover { border-color: #1677FF; color: #1677FF; }
 
-.btn-save { background: #1677FF; color: #fff; border-color: #1677FF; font-weight: 500; min-width: 56px; }
-.btn-save:hover { background: #4096FF; border-color: #4096FF; color: #fff; }
+.et-btn.btn-save { background: #1677FF; color: #fff; border-color: #1677FF; font-weight: 500; min-width: 56px; }
+.et-btn.btn-save:hover { background: #4096FF; border-color: #4096FF; color: #fff; }
 
 .btn-cancel-edit {
     border: none !important;
