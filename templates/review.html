@@ -16,8 +16,6 @@
         <small class="ms-2 text-muted">校验人: <strong>{{ assigned_map.get(current_l1).assignee if assigned_map.get(current_l1) else '待分配' }}</strong></small>
     </div>
     <div class="d-flex align-items-center gap-2">
-        <a href="{{ url_for('trace.trace_page', project_id=project.id, l2=l2_index) }}" target="_blank"
-           class="btn btn-sm btn-outline-primary py-0" style="font-size:11px;">溯源</a>
         {% set is_mine = (assigned_map.get(current_l1) and assigned_map[current_l1].assignee == username) or project.created_by == username %}
         <span class="badge" style="background:{{ '#36cf5066' if is_mine else '#ffb70045' }};color:#fff;font-size:11px;">
             {{ '我的模块' if is_mine else '只读' }}
