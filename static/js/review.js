@@ -180,6 +180,7 @@ function switchPair(idx) {
 // ==================== Init ====================
 
 document.addEventListener('DOMContentLoaded', function() {
+    restoreViewState();
     initAllRefTexts();
     initContentDisplays();
     bindAllEvents();
@@ -244,7 +245,10 @@ function bindAllEvents() {
                 if (result.ok) {
                     showSaved();
                     updateStatusButtons(fieldId, status);
-                    setTimeout(function() { location.reload(); }, 400);
+                    setTimeout(function() {
+                        saveViewState();
+                        location.reload();
+                    }, 400);
                 }
             } catch(e) {}
         });
@@ -400,9 +404,43 @@ function toggleSidebar() {
         col.style.width = '180px';
         tree.style.display = '';
         if (btn) btn.textContent = '«';
+        sessionStorage.setItem('sidebarCollapsed', '0');
     } else {
         col.style.width = '0';
         tree.style.display = 'none';
+        if (btn) btn.textContent = '»';
+        sessionStorage.setItem('sidebarCollapsed', '1');
+    }
+}
+
+function saveViewState() {
+    // 记住当前 Tab
+    var activeTab = document.querySelector('.pair-tab.active');
+    if (activeTab) {
+        sessionStorage.setItem('activePairTab', activeTab.getAttribute('data-pair'));
+    }
+    // 记住侧边栏状态
+    var tree = document.getElementById('sidebarTree');
+    if (tree && tree.style.display === 'none') {
+        sessionStorage.setItem('sidebarCollapsed', '1');
+    } else {
+        sessionStorage.setItem('sidebarCollapsed', '0');
+    }
+}
+
+function restoreViewState() {
+    // 恢复 Tab
+    var savedTab = sessionStorage.getItem('activePairTab');
+    if (savedTab && savedTab !== '0') {
+        switchPair(parseInt(savedTab));
+    }
+    // 恢复侧边栏
+    if (sessionStorage.getItem('sidebarCollapsed') === '1') {
+        var col = document.getElementById('sidebarCol');
+        var tree = document.getElementById('sidebarTree');
+        var btn = document.getElementById('sidebarToggleBtn');
+        if (col) col.style.width = '0';
+        if (tree) tree.style.display = 'none';
         if (btn) btn.textContent = '»';
     }
 }
