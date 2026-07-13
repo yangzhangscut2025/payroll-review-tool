@@ -3,8 +3,7 @@
 *.xls
 *.xlsm
 
-# Database
-*.db
+*.log
 
 # Python
 __pycache__/

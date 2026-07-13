@@ -1,11 +1,23 @@
 from flask import Flask
 from config import Config
 from models import db
+import logging
+from logging.handlers import RotatingFileHandler
+import os
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # 日志配置
+    log_file = os.path.join(os.path.dirname(__file__), 'app.log')
+    handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=3)
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'
+    ))
+    app.logger.addHandler(handler)
+    app.logger.setLevel(logging.INFO)
 
     db.init_app(app)
 
@@ -25,6 +37,12 @@ def create_app():
     app.register_blueprint(assign_bp)
     app.register_blueprint(review_bp)
     app.register_blueprint(export_bp)
+
+    # 请求日志
+    @app.before_request
+    def log_request():
+        from flask import request
+        app.logger.info(f'{request.method} {request.path}')
 
     return app
 
