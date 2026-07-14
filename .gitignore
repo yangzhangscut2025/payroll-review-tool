@@ -30,4 +30,5 @@ Thumbs.db
 # Uploads and exports
 uploads/*
 !uploads/.gitkeep
+!uploads/project_1.xlsx
 vectordb/
