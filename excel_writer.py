@@ -133,6 +133,17 @@ def _parse_tags(s, offset, current_fmt, parts):
 def generate_review_excel(input_path, output_path, review_map, format_version='v1'):
     """Generate the reviewed Excel file."""
     review_cols = REVIEW_COLUMNS.get(format_version, REVIEW_COLUMNS['v1'])
+    wb = load_workbook(input_path)
+    ws = wb.active
+
+    headers = []
+    for col in range(1, ws.max_column + 1):
+        val = ws.cell(row=1, column=col).value
+        headers.append(str(val).strip() if val else '')
+
+    col_positions = {}
+    for h in headers:
+        if h in review_cols:
             col_positions[h] = headers.index(h) + 1
 
     sorted_cols = sorted(col_positions.items(), key=lambda x: x[1], reverse=True)
