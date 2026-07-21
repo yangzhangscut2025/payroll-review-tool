@@ -479,6 +479,8 @@ function copyPrompt() {
     btn.textContent = '✓ 已复制';
     setTimeout(function() { btn.textContent = orig; }, 2000);
 }
+
+function toggleSidebar() {
     var col = document.getElementById('sidebarCol');
     var tree = document.getElementById('sidebarTree');
     var btn = document.getElementById('sidebarToggleBtn');
