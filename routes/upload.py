@@ -46,6 +46,7 @@ def upload_excel(project_id):
         result = parse_excel(filepath, project.id, db)
         project.total_modules = result['l1_count']
         project.completed_modules = 0
+        project.format_version = result.get('format_version', 'v1')
         project.status = '进行中'
         db.session.commit()
     except ValueError as e:

@@ -15,11 +15,17 @@ FIELD_TYPE_MAP = {
     '参考依据（行业常规）': '行业常规链接',
 }
 
-PAIRS = [
-    {'content': '实务内容（官方）', 'ref': '参考依据（官方）', 'label': '官方'},
-    {'content': '实务内容（行业通用）', 'ref': '参考依据（行业权威）', 'label': '行业通用'},
-    {'content': '实务内容（内部口径）', 'ref': '参考依据（行业常规）', 'label': '内部口径'},
-]
+PAIRS = {
+    'v1': [
+        {'content': '实务内容（官方）', 'ref': '参考依据（官方）', 'label': '官方'},
+        {'content': '实务内容（行业通用）', 'ref': '参考依据（行业权威）', 'label': '行业通用'},
+        {'content': '实务内容（内部口径）', 'ref': '参考依据（行业常规）', 'label': '内部口径'},
+    ],
+    'v2': [
+        {'content': '官方规则', 'ref': '官方网站', 'label': '官方规则'},
+        {'content': '行业通用', 'ref': '权威网站', 'label': '行业通用'},
+    ],
+}
 
 
 def url_extract(text):
@@ -97,8 +103,9 @@ def review_workspace(project_id):
     ).order_by(ReviewField.id).all()
 
     # Build pairs
+    pairs = PAIRS.get(project.format_version or 'v1', PAIRS['v1'])
     pairs_data = []
-    for pair in PAIRS:
+    for pair in pairs:
         content_field = None
         ref_field = None
         for f in l2_fields:

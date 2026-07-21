@@ -5,14 +5,15 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 # Review column list and their positions
-REVIEW_COLUMNS = [
-    '实务内容（官方）',
-    '实务内容（行业通用）',
-    '实务内容（内部口径）',
-    '参考依据（官方）',
-    '参考依据（行业权威）',
-    '参考依据（行业常规）',
-]
+REVIEW_COLUMNS = {
+    'v1': [
+        '实务内容（官方）', '实务内容（行业通用）', '实务内容（内部口径）',
+        '参考依据（官方）', '参考依据（行业权威）', '参考依据（行业常规）',
+    ],
+    'v2': [
+        '官方规则', '行业通用', '官方网站', '权威网站',
+    ],
+}
 
 STATUS_BG_COLORS = {
     '待审阅': 'F0F0F0',
@@ -129,25 +130,9 @@ def _parse_tags(s, offset, current_fmt, parts):
             i = next_tag
 
 
-def generate_review_excel(input_path, output_path, review_map):
-    """Generate the reviewed Excel file.
-
-    Args:
-        input_path: Path to original Excel
-        output_path: Where to save
-        review_map: dict of (row_index, field_type) -> ReviewField model
-    """
-    wb = load_workbook(input_path)
-    ws = wb.active
-
-    headers = []
-    for col in range(1, ws.max_column + 1):
-        val = ws.cell(row=1, column=col).value
-        headers.append(str(val).strip() if val else '')
-
-    col_positions = {}
-    for h in headers:
-        if h in REVIEW_COLUMNS:
+def generate_review_excel(input_path, output_path, review_map, format_version='v1'):
+    """Generate the reviewed Excel file."""
+    review_cols = REVIEW_COLUMNS.get(format_version, REVIEW_COLUMNS['v1'])
             col_positions[h] = headers.index(h) + 1
 
     sorted_cols = sorted(col_positions.items(), key=lambda x: x[1], reverse=True)

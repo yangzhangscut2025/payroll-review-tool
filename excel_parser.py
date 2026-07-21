@@ -1,34 +1,39 @@
 import openpyxl
 
-# Required column names (exact match)
-REQUIRED_COLUMNS = [
-    'l1_标题',
-    'l1_说明',
-    'l2_标题',
-    'l2_说明',
-    '实务内容（官方）',
-    '实务内容（行业通用）',
-    '实务内容（内部口径）',
-    '参考依据（官方）',
-    '参考依据（行业权威）',
-    '参考依据（行业常规）',
-    '属性',
-    '状态',
-    '内部计算链路',
+# V1 格式（13列，3对）
+V1_REQUIRED_COLUMNS = [
+    'l1_标题', 'l1_说明', 'l2_标题', 'l2_说明',
+    '实务内容（官方）', '实务内容（行业通用）', '实务内容（内部口径）',
+    '参考依据（官方）', '参考依据（行业权威）', '参考依据（行业常规）',
+    '属性', '状态', '内部计算链路',
 ]
 
-REVIEW_COLUMNS = [
-    '实务内容（官方）',
-    '实务内容（行业通用）',
-    '实务内容（内部口径）',
-    '参考依据（官方）',
-    '参考依据（行业权威）',
-    '参考依据（行业常规）',
+V1_REVIEW_COLUMNS = [
+    '实务内容（官方）', '实务内容（行业通用）', '实务内容（内部口径）',
+    '参考依据（官方）', '参考依据（行业权威）', '参考依据（行业常规）',
 ]
+
+# V2 格式（7列，2对）
+V2_REQUIRED_COLUMNS = [
+    '标题Ⅰ', '标题Ⅱ', '说明',
+    '官方规则', '行业通用',
+    '官方网站', '权威网站',
+]
+
+V2_REVIEW_COLUMNS = [
+    '官方规则', '行业通用', '官方网站', '权威网站',
+]
+
+
+def detect_format(headers):
+    """根据表头自动识别格式版本。"""
+    first = headers[0] if headers else ''
+    if first == '标题Ⅰ':
+        return 'v2'
+    return 'v1'
 
 
 def get_merged_cell_map(ws):
-    """Build a map from merged cell ranges to the top-left value."""
     merged = {}
     for merge_range in ws.merged_cells.ranges:
         min_col = merge_range.min_col
@@ -41,11 +46,9 @@ def get_merged_cell_map(ws):
 
 
 def parse_excel(filepath, project_id, db):
-    """Parse uploaded Excel and create ReviewField records."""
     wb = openpyxl.load_workbook(filepath, data_only=True)
     ws = wb.active
 
-    # Read headers
     headers = []
     for col in range(1, ws.max_column + 1):
         val = ws.cell(row=1, column=col).value
@@ -53,48 +56,56 @@ def parse_excel(filepath, project_id, db):
             val = str(val).strip()
         headers.append(val)
 
-    # Validate required columns
-    for i, req in enumerate(REQUIRED_COLUMNS):
+    # 自动识别格式
+    fmt = detect_format(headers)
+    if fmt == 'v2':
+        required = V2_REQUIRED_COLUMNS
+        review_cols = V2_REVIEW_COLUMNS
+    else:
+        required = V1_REQUIRED_COLUMNS
+        review_cols = V1_REVIEW_COLUMNS
+
+    # 校验
+    for i, req in enumerate(required):
         if i >= len(headers) or headers[i] != req:
             raise ValueError(
                 f"表格结构不符合预期，请检查列名是否完整且完全匹配。"
                 f"列 {i+1}：期望「{req}」，实际「{headers[i] if i < len(headers) else '无'}」"
             )
 
-    # Build column index map for review columns
     col_map = {}
     for c_idx, h in enumerate(headers):
-        if h in REVIEW_COLUMNS:
-            col_map[h] = c_idx + 1  # 1-indexed
+        if h in review_cols:
+            col_map[h] = c_idx + 1
 
-    # Build merged cell map for l1/l2 fill-down
     merged_map = get_merged_cell_map(ws)
 
-    # Parse data rows
     from models import ReviewField
     l1_set = set()
     l2_set = set()
     total_fields = 0
 
     for row in range(2, ws.max_row + 1):
-        # Check if row is empty
         row_has_data = False
-        for c in range(1, min(14, ws.max_column + 1)):
+        for c in range(1, min(len(headers) + 1, ws.max_column + 1)):
             if ws.cell(row=row, column=c).value is not None:
                 row_has_data = True
                 break
         if not row_has_data:
             continue
 
-        # Get l1/l2 with merged cell fill-down
-        l1_title = ws.cell(row=row, column=1).value
+        # V1: l1=col1, l2=col3; V2: l1=col1, l2=col2
+        l1_col = 1
+        l2_col = 3 if fmt == 'v1' else 2
+
+        l1_title = ws.cell(row=row, column=l1_col).value
         if not l1_title:
-            l1_title = merged_map.get((row, 1), '')
+            l1_title = merged_map.get((row, l1_col), '')
         l1_title = str(l1_title).strip() if l1_title else ''
 
-        l2_title = ws.cell(row=row, column=3).value
+        l2_title = ws.cell(row=row, column=l2_col).value
         if not l2_title:
-            l2_title = merged_map.get((row, 3), '')
+            l2_title = merged_map.get((row, l2_col), '')
         l2_title = str(l2_title).strip() if l2_title else ''
 
         if not l1_title or not l2_title:
@@ -103,8 +114,7 @@ def parse_excel(filepath, project_id, db):
         l1_set.add(l1_title)
         l2_set.add(f"{l1_title}|{l2_title}")
 
-        # Create review fields for each review column
-        for field_type in REVIEW_COLUMNS:
+        for field_type in review_cols:
             col = col_map.get(field_type)
             if not col:
                 continue
@@ -118,7 +128,7 @@ def parse_excel(filepath, project_id, db):
                 module_l2=l2_title,
                 field_type=field_type,
                 original_content=original_str,
-                changed_content=original_str,  # Initial copy
+                changed_content=original_str,
                 status='待审阅',
             )
             db.session.add(rf)
@@ -129,4 +139,5 @@ def parse_excel(filepath, project_id, db):
         'l1_count': len(l1_set),
         'l2_count': len(l2_set),
         'total_fields': total_fields,
+        'format_version': fmt,
     }

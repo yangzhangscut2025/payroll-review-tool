@@ -35,7 +35,7 @@ def export_result(project_id):
 
     current_app.logger.info(f"Export: {len(fields)} fields, {html_count} with color spans")
 
-    generate_review_excel(project.file_path, output_path, review_map)
+    generate_review_excel(project.file_path, output_path, review_map, project.format_version or 'v1')
 
     project.output_path = output_path
     project.updated_at = db.func.now()

@@ -21,6 +21,7 @@ class Project(db.Model):
     completed_modules = db.Column(db.Integer, default=0)
     status = db.Column(db.String(20), default='进行中')
     deleted_at = db.Column(db.DateTime, nullable=True)
+    format_version = db.Column(db.String(10), default='v1')  # v1=13列3对, v2=7列2对
 
     assignments = db.relationship('ModuleAssignment', backref='project',
                                   lazy='dynamic', cascade='all, delete-orphan')
