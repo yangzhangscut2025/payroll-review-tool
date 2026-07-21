@@ -97,14 +97,6 @@ def _parse_tags(s, offset, current_fmt, parts):
                     elif rgb_match:
                         r, g, b = int(rgb_match.group(1)), int(rgb_match.group(2)), int(rgb_match.group(3))
                         new_fmt['color'] = f'{r:02X}{g:02X}{b:02X}'
-                if 'background-color' in style:
-                    hex_match = re.search(r'background-color:\s*(#[0-9a-fA-F]{6})', style)
-                    rgb_match = re.search(r'background-color:\s*rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)', style)
-                    if hex_match:
-                        new_fmt['color'] = hex_match.group(1).lstrip('#')
-                    elif rgb_match:
-                        r, g, b = int(rgb_match.group(1)), int(rgb_match.group(2)), int(rgb_match.group(3))
-                        new_fmt['color'] = f'{r:02X}{g:02X}{b:02X}'
 
             # Recursively parse inner content with new format
             closing = '</' + tag_name + '>'

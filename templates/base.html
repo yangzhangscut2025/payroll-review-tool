@@ -16,6 +16,7 @@
             </a>
             {% if username %}
             <div class="d-flex align-items-center">
+                <a href="{{ url_for('ai_usage.usage_dashboard') }}" class="text-white me-3" style="text-decoration:none;font-size:13px;opacity:0.85;">📊 AI用量</a>
                 <span class="text-white me-3" style="opacity:0.9; font-size:13px;">
                     {{ username }}
                 </span>

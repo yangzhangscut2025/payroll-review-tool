@@ -11,7 +11,7 @@ async function fetchWithRetry(url, options, maxRetries) {
         try {
             var resp = await fetch(url, options);
             if (resp.ok) return resp;
-            var body = await resp.json();
+            var body = await resp.clone().json();
             if (body.error === '数据库忙，请重试') {
                 lastError = new Error(body.error);
                 await new Promise(function(r) { setTimeout(r, 500 * (i + 1)); });
@@ -184,6 +184,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initAllRefTexts();
     initContentDisplays();
     bindAllEvents();
+});
+
+window.addEventListener('beforeunload', function() {
+    saveViewState();
 });
 
 function initAllRefTexts() {
@@ -396,17 +400,37 @@ function navigateToIdx(projectId, idx) {
     window.location.href = '/projects/' + projectId + '/review?l2=' + idx;
 }
 
+function getSidebarWidth() {
+    var tree = document.getElementById('sidebarTree');
+    if (tree && tree.style.display === 'none') return 0;
+    return 180;
+}
+
+function updateMainColWidth() {
+    var mainCol = document.getElementById('mainCol');
+    if (!mainCol) return;
+    var sidebarW = getSidebarWidth();
+    var promptCol = document.getElementById('promptCol');
+    var promptW = (promptCol && promptCol.style.display !== 'none') ? 450 : 0;
+    if (sidebarW === 0 && promptW === 0) {
+        mainCol.style.maxWidth = '';
+    } else {
+        mainCol.style.maxWidth = 'calc(100% - ' + sidebarW + 'px - ' + promptW + 'px)';
+    }
+}
+
 function togglePrompt() {
     var col = document.getElementById('promptCol');
-    var mainCol = document.getElementById('mainCol');
-    if (!col || !mainCol) return;
+    if (!col) return;
     if (col.style.display === 'none') {
         col.style.display = '';
-        mainCol.style.maxWidth = 'calc(100% - 180px - 350px)';
+        updateMainColWidth();
         generatePrompt();
+        sessionStorage.setItem('promptOpen', '1');
     } else {
         col.style.display = 'none';
-        mainCol.style.maxWidth = 'calc(100% - 180px)';
+        updateMainColWidth();
+        sessionStorage.setItem('promptOpen', '0');
     }
 }
 
@@ -424,17 +448,40 @@ function generatePrompt() {
     var contentView = panel.querySelector('.content-view');
     var contentText = contentView ? (contentView.textContent || '').trim() : '';
 
-    // Get reference URLs
-    var refTextEl = panel.querySelector('.ref-text');
+    // Get reference URLs — v2 merges all ref panels, v1 uses current pair only
     var urls = [];
-    if (refTextEl) {
-        var dataUrls = refTextEl.getAttribute('data-urls');
-        if (dataUrls) {
-            try { urls = JSON.parse(dataUrls); } catch(e) {}
+    if (FORMAT_VERSION === 'v2') {
+        // Collect links from both 官方网站 + 权威网站
+        var pairsData = [
+            {label: '官方网站', panelId: 'pairPanel0'},
+            {label: '权威网站', panelId: 'pairPanel1'}
+        ];
+        var linkIdx = 1;
+        for (var p = 0; p < pairsData.length; p++) {
+            var panel = document.getElementById(pairsData[p].panelId);
+            if (!panel) continue;
+            var refEl = panel.querySelector('.ref-text');
+            if (!refEl) continue;
+            var dataUrls = refEl.getAttribute('data-urls');
+            if (!dataUrls) continue;
+            var panelUrls = [];
+            try { panelUrls = JSON.parse(dataUrls); } catch(e) {}
+            for (var u = 0; u < panelUrls.length; u++) {
+                urls.push({source: pairsData[p].label, num: linkIdx, url: panelUrls[u]});
+                linkIdx++;
+            }
+        }
+    } else {
+        var refTextEl = panel.querySelector('.ref-text');
+        if (refTextEl) {
+            var dataUrls = refTextEl.getAttribute('data-urls');
+            if (dataUrls) {
+                try { urls = JSON.parse(dataUrls); } catch(e) {}
+            }
         }
     }
 
-    var prompt = '【任务】\n请根据我提供的有效链接，逐条核对以下信息的准确性。\n\n';
+    var prompt = '【任务】\n请根据我提供的有效链接，逐条核对以下信息的准确性。\n';
     prompt += '【核对规则】\n';
     prompt += '一、逐项判断标准\n';
     prompt += '判断结论\t适用情形\n';
@@ -443,30 +490,36 @@ function generatePrompt() {
     prompt += '错误+缺漏\t信息同时存在错误和遗漏\n';
     prompt += '缺漏\t核心正确，但漏掉了关键限定条件\n';
     prompt += '未找到\t在所有链接中均无直接原文依据\n';
-    prompt += '推断成立\t无直接原文但可通过多条链接组合推断\n\n';
+    prompt += '推断成立\t无直接原文但可通过多条链接组合推断\n';
     prompt += '二、拆分处理\n';
-    prompt += '● 如一条信息包含多个独立主张，需逐项拆分判断\n\n';
+    prompt += '● 如一条信息包含多个独立主张，需逐项拆分判断\n';
     prompt += '三、数据核验\n';
-    prompt += '● 优先核验法律条款编号、日期、数字比例等硬性数据\n\n';
+    prompt += '● 优先核验法律条款编号、日期、数字比例等硬性数据\n';
     prompt += '四、上下文检查\n';
-    prompt += '● 检查是否存在过度泛化，补充原文限定条件\n\n';
+    prompt += '● 检查是否存在过度泛化，补充原文限定条件\n';
     prompt += '五、链接矛盾处理\n';
-    prompt += '● 以权威性更高、时效性更新的来源为准\n\n';
+    prompt += '● 以权威性更高、时效性更新的来源为准\n';
     prompt += '六、否定性信息记录\n';
-    prompt += '● 判断为"未找到"或"错误"，需指出"该内容未出现在链接X中"\n\n';
+    prompt += '● 判断为"未找到"或"错误"，需指出"该内容未出现在链接X中"\n';
     prompt += '七、推断成立的标注\n';
-    prompt += '● 说明推断链条\n\n';
+    prompt += '● 说明推断链条\n';
     prompt += '八、时效性风险标注\n';
-    prompt += '● 3年以上链接需标注"建议与最新法规交叉验证"\n\n';
+    prompt += '● 3年以上链接需标注"建议与最新法规交叉验证"\n';
     prompt += '九、外部引用检查\n';
-    prompt += '● 超链接需说明是否可访问及内容匹配\n\n';
+    prompt += '● 超链接需说明是否可访问及内容匹配\n';
     prompt += '【输出格式】\n';
     prompt += '【信息序号X】\n 判断：[正确/错误/错误+缺漏/缺漏/未找到/推断成立]\n';
-    prompt += ' 溯源：[链接编号]\n 说明：\n\n';
-    prompt += '【待核对信息】\n' + contentText + '\n\n';
+    prompt += ' 溯源：[链接编号]\n 说明：\n';
+    prompt += '【待核对信息】\n' + contentText + '\n';
     prompt += '【参考链接】\n';
-    for (var i = 0; i < urls.length; i++) {
-        prompt += '链接' + (i+1) + '：' + urls[i] + '\n';
+    if (FORMAT_VERSION === 'v2') {
+        for (var i = 0; i < urls.length; i++) {
+            prompt += '链接' + urls[i].num + '（' + urls[i].source + '）：' + urls[i].url + '\n';
+        }
+    } else {
+        for (var i = 0; i < urls.length; i++) {
+            prompt += '链接' + (i+1) + '：' + urls[i] + '\n';
+        }
     }
 
     promptTemplate.value = prompt;
@@ -481,6 +534,70 @@ function copyPrompt() {
     var orig = btn.textContent;
     btn.textContent = '✓ 已复制';
     setTimeout(function() { btn.textContent = orig; }, 2000);
+}
+
+async function sendToAI(projectId) {
+    var promptText = document.getElementById('promptText');
+    var loading = document.getElementById('aiResponseLoading');
+    var content = document.getElementById('aiResponseContent');
+    var empty = document.getElementById('aiResponseEmpty');
+
+    if (!promptText || !promptText.value.trim()) {
+        generatePrompt();
+    }
+
+    var prompt = promptText.value.trim();
+    if (!prompt) {
+        alert('请先生成核对 Prompt');
+        return;
+    }
+
+    // Show loading
+    if (loading) loading.style.display = '';
+    if (content) content.style.display = 'none';
+    if (empty) empty.style.display = 'none';
+
+    try {
+        var resp = await fetchWithRetry('/api/review/' + projectId + '/ai-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: prompt,
+                module_l1: CURRENT_L1 || '',
+                module_l2: CURRENT_L2 || ''
+            })
+        }, 1); // no retry for AI calls
+
+        var result = await resp.json();
+
+        if (loading) loading.style.display = 'none';
+
+        if (result.ok) {
+            if (content) {
+                content.textContent = result.content;
+                content.style.display = '';
+            }
+            if (result.usage) {
+                var info = document.createElement('div');
+                info.style.cssText = 'font-size:10px;color:#8C8C8C;margin-top:4px;text-align:right;';
+                info.textContent = 'tokens: ' + result.usage.prompt_tokens + ' + ' + result.usage.completion_tokens;
+                content.appendChild(info);
+            }
+        } else {
+            if (content) {
+                content.textContent = '❌ ' + (result.error || '未知错误');
+                content.style.display = '';
+                content.style.color = '#C00000';
+            }
+        }
+    } catch (e) {
+        if (loading) loading.style.display = 'none';
+        if (content) {
+            content.textContent = '❌ 网络请求失败：' + (e.message || '请检查网络连接');
+            content.style.display = '';
+            content.style.color = '#C00000';
+        }
+    }
 }
 
 function toggleSidebar() {
@@ -498,6 +615,7 @@ function toggleSidebar() {
         if (btn) btn.textContent = '»';
         sessionStorage.setItem('sidebarCollapsed', '1');
     }
+    updateMainColWidth();
 }
 
 function saveViewState() {
@@ -512,6 +630,11 @@ function saveViewState() {
         sessionStorage.setItem('sidebarCollapsed', '1');
     } else {
         sessionStorage.setItem('sidebarCollapsed', '0');
+    }
+    // 记住 Prompt 面板状态
+    var promptCol = document.getElementById('promptCol');
+    if (promptCol) {
+        sessionStorage.setItem('promptOpen', promptCol.style.display === 'none' ? '0' : '1');
     }
 }
 
@@ -530,6 +653,15 @@ function restoreViewState() {
         if (tree) tree.style.display = 'none';
         if (btn) btn.textContent = '»';
     }
+    // 恢复 Prompt 面板
+    if (sessionStorage.getItem('promptOpen') === '1') {
+        var promptCol = document.getElementById('promptCol');
+        if (promptCol) {
+            promptCol.style.display = '';
+            generatePrompt();
+        }
+    }
+    updateMainColWidth();
 }
 
 // ==================== Keyboard ====================

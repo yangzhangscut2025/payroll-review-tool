@@ -18,6 +18,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# Secrets
+.env
+
 # Personal notes
 # Personal notes
 项目复盘.md

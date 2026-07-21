@@ -14,17 +14,36 @@
     <div class="col-md-8">
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">📁 {{ project.name }}</h5>
-                <span class="badge {% if project.status == '已完成' %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                    {{ project.status }}
-                </span>
+                <h5 class="mb-0">📁 <span id="displayName">{{ project.name }}</span></h5>
+                <div>
+                    {% if project.created_by == username %}
+                    <button class="btn btn-sm py-0 px-1" onclick="toggleEditProject()" style="font-size:12px;" title="编辑项目信息">✎ 编辑</button>
+                    {% endif %}
+                    <span class="badge {% if project.status == '已完成' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                        {{ project.status }}
+                    </span>
+                </div>
             </div>
             <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-3"><strong>国家：</strong>{{ project.country }}</div>
+                <div id="projectInfoView" class="row mb-3">
+                    <div class="col-md-3"><strong>国家：</strong><span id="displayCountry">{{ project.country }}</span></div>
                     <div class="col-md-3"><strong>负责人：</strong>{{ project.created_by }}</div>
                     <div class="col-md-3"><strong>创建时间：</strong>{{ project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else '-' }}</div>
                     <div class="col-md-3"><strong>最后更新：</strong>{{ project.updated_at.strftime('%Y-%m-%d %H:%M') if project.updated_at else '-' }}</div>
+                </div>
+                <div id="projectInfoEdit" class="row mb-3" style="display:none;">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">项目名称</label>
+                        <input type="text" class="form-control form-control-sm" id="editName" value="{{ project.name }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">国家</label>
+                        <input type="text" class="form-control form-control-sm" id="editCountry" value="{{ project.country }}">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end gap-1">
+                        <button class="btn btn-sm btn-primary" onclick="saveProjectEdit({{ project.id }})">保存</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleEditProject()">取消</button>
+                    </div>
                 </div>
 
                 <!-- Overall Progress -->
@@ -170,6 +189,42 @@
 
 {% block scripts %}
 <script>
+function toggleEditProject() {
+    var view = document.getElementById('projectInfoView');
+    var edit = document.getElementById('projectInfoEdit');
+    if (edit.style.display === 'none') {
+        view.style.display = 'none';
+        edit.style.display = '';
+    } else {
+        view.style.display = '';
+        edit.style.display = 'none';
+    }
+}
+
+async function saveProjectEdit(id) {
+    var name = document.getElementById('editName').value.trim();
+    var country = document.getElementById('editCountry').value.trim();
+    if (!name || !country) { alert('项目名称和国家不能为空'); return; }
+    try {
+        var resp = await fetch('/projects/' + id + '/edit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name, country: country})
+        });
+        if (resp.ok) {
+            var data = await resp.json();
+            document.getElementById('displayName').textContent = data.name;
+            document.getElementById('displayCountry').textContent = data.country;
+            toggleEditProject();
+        } else {
+            var text = await resp.text();
+            alert(text || '保存失败');
+        }
+    } catch(e) {
+        alert('网络错误：' + e.message);
+    }
+}
+
 function deleteProject(id, name) {
     if (confirm(`确定要删除项目「${name}」吗？此操作将删除所有相关数据，不可恢复。`)) {
         const form = document.createElement('form');

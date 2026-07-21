@@ -149,11 +149,14 @@ def review_workspace(project_id):
         import openpyxl
         wb = openpyxl.load_workbook(project.file_path, data_only=True)
         ws = wb.active
+        fmt = project.format_version or 'v1'
+        l2_col = 3 if fmt == 'v1' else 2
+        desc_col = 4 if fmt == 'v1' else 3
         for row in range(2, ws.max_row + 1):
             l1_val = str(ws.cell(row=row, column=1).value or '').strip()
-            l2_val = str(ws.cell(row=row, column=3).value or '').strip()
+            l2_val = str(ws.cell(row=row, column=l2_col).value or '').strip()
             if l1_val == current_l1 and l2_val == current_l2:
-                desc = ws.cell(row=row, column=4).value
+                desc = ws.cell(row=row, column=desc_col).value
                 if desc:
                     l2_description = str(desc).strip()
                 break
@@ -268,3 +271,103 @@ def _update_module_progress(project, module_l1):
     project.total_modules = len(l1_set)
     project.status = '已完成' if completed_count == len(l1_set) else '进行中'
     db.session.commit()
+
+
+@review_bp.route('/api/review/<int:project_id>/ai-check', methods=['POST'])
+def ai_check(project_id):
+    """Proxy to DeepSeek API for AI-powered compliance checking."""
+    username = session.get('username')
+    if not username:
+        return jsonify({'error': '未登录'}), 401
+
+    project = Project.query.get_or_404(project_id)
+
+    data = request.get_json()
+    if not data or not data.get('prompt'):
+        return jsonify({'error': '请提供核对内容'}), 400
+
+    prompt = data['prompt']
+
+    from flask import current_app
+    api_key = current_app.config.get('DEEPSEEK_API_KEY', '')
+    if not api_key:
+        return jsonify({'error': 'DeepSeek API Key 未配置，请在环境变量中设置 DEEPSEEK_API_KEY'}), 500
+
+    api_url = current_app.config.get('DEEPSEEK_API_URL',
+        'https://api.deepseek.com/v1/chat/completions')
+    model = current_app.config.get('DEEPSEEK_MODEL', 'deepseek-chat')
+
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'user', 'content': prompt},
+        ],
+        'temperature': 0.3,
+        'max_tokens': 4096,
+        'stream': False,
+    }
+
+    try:
+        import requests
+        resp = requests.post(
+            api_url,
+            json=payload,
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+            timeout=120,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+        content = result['choices'][0]['message']['content']
+        usage = result.get('usage', {})
+
+        # Log AI usage
+        try:
+            from models import AIUsageLog
+            log = AIUsageLog(
+                username=username,
+                project_id=project.id,
+                project_name=project.name,
+                module_l1=data.get('module_l1', ''),
+                module_l2=data.get('module_l2', ''),
+                model=result.get('model', model),
+                prompt_tokens=usage.get('prompt_tokens', 0),
+                completion_tokens=usage.get('completion_tokens', 0),
+            )
+            db.session.add(log)
+            db.session.commit()
+        except Exception as log_err:
+            current_app.logger.error(f'Failed to log AI usage: {log_err}')
+
+        return jsonify({
+            'ok': True,
+            'content': content,
+            'model': result.get('model', model),
+            'usage': {
+                'prompt_tokens': usage.get('prompt_tokens', 0),
+                'completion_tokens': usage.get('completion_tokens', 0),
+            },
+        })
+    except requests.exceptions.Timeout:
+        current_app.logger.error('DeepSeek API timeout')
+        return jsonify({'error': 'AI 响应超时（120秒），请稍后重试'}), 504
+    except requests.exceptions.RequestException as e:
+        current_app.logger.error(f'DeepSeek API error: {e}')
+        # Try to extract the API's own error message
+        detail = str(e)
+        try:
+            if e.response is not None:
+                body = e.response.json()
+                err = body.get('error', {})
+                if isinstance(err, dict):
+                    detail = err.get('message_zh', err.get('message', str(e)))
+                elif isinstance(err, str):
+                    detail = err
+        except Exception:
+            pass
+        return jsonify({'error': f'AI 请求失败：{detail}'}), 502
+    except (KeyError, IndexError) as e:
+        current_app.logger.error(f'DeepSeek API unexpected response: {e}')
+        return jsonify({'error': 'AI 返回数据格式异常'}), 502

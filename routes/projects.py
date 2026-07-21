@@ -80,6 +80,34 @@ def project_detail(project_id):
                            user_list=get_all_users())
 
 
+@projects_bp.route('/projects/<int:project_id>/edit', methods=['POST'])
+def edit_project(project_id):
+    username = login_required()
+    if not username:
+        return redirect(url_for('auth.login_page'))
+
+    project = Project.query.get_or_404(project_id)
+    if project.created_by != username:
+        return "无权限", 403
+
+    data = request.get_json()
+    if not data:
+        return "无效请求", 400
+
+    name = data.get('name', '').strip()
+    country = data.get('country', '').strip()
+    if not name or not country:
+        return "文件名称和国家为必填项", 400
+
+    project.name = name
+    project.country = country
+    project.updated_at = db.func.now()
+    db.session.commit()
+
+    from flask import jsonify
+    return jsonify({'ok': True, 'name': name, 'country': country})
+
+
 @projects_bp.route('/projects/<int:project_id>/delete', methods=['POST'])
 def delete_project(project_id):
     username = login_required()

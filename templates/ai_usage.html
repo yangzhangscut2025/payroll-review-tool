@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}AI 用量统计{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">📊 AI 用量统计</h5>
+    <small class="text-muted">DeepSeek 定价：输入 ¥1/M tokens · 输出 ¥2/M tokens</small>
+</div>
+
+<!-- Overview cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small mb-1">总调用次数</div>
+                <div class="fs-4 fw-bold">{{ total_calls }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small mb-1">总 Token 用量</div>
+                <div class="fs-4 fw-bold">{{ "{:,}".format(total_tokens) }}</div>
+                <small class="text-muted">输入 {{ "{:,}".format(total_prompt) }} / 输出 {{ "{:,}".format(total_completion) }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small mb-1">估算费用</div>
+                <div class="fs-4 fw-bold" style="color:#1677FF;">¥{{ "%.2f"|format(est_cost) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body py-3">
+                <div class="text-muted small mb-1">人均调用</div>
+                <div class="fs-4 fw-bold">{{ "%.1f"|format(total_calls / user_stats|length) if user_stats|length > 0 else '0' }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Per-user table -->
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header">👤 按人员统计</div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0" style="font-size:13px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>用户</th>
+                            <th class="text-end">调用次数</th>
+                            <th class="text-end">输入 Token</th>
+                            <th class="text-end">输出 Token</th>
+                            <th class="text-end">总 Token</th>
+                            <th class="text-end">估算费用</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in user_stats %}
+                        <tr>
+                            <td><strong>{{ u.username }}</strong></td>
+                            <td class="text-end">{{ u.calls }}</td>
+                            <td class="text-end">{{ "{:,}".format(u.prompt_tokens) }}</td>
+                            <td class="text-end">{{ "{:,}".format(u.completion_tokens) }}</td>
+                            <td class="text-end fw-semibold">{{ "{:,}".format(u.total_tokens) }}</td>
+                            <td class="text-end" style="color:#1677FF;">¥{{ "%.2f"|format(u.est_cost) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" class="text-center text-muted py-4">暂无 AI 调用记录</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-project table -->
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">📁 按项目统计</div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0" style="font-size:13px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>项目</th>
+                            <th class="text-end">次数</th>
+                            <th class="text-end">总 Token</th>
+                            <th class="text-end">费用</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in project_stats %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('review.review_workspace', project_id=p.project_id) }}" class="text-decoration-none">
+                                    {{ p.project_name }}
+                                </a>
+                            </td>
+                            <td class="text-end">{{ p.calls }}</td>
+                            <td class="text-end">{{ "{:,}".format(p.total_tokens) }}</td>
+                            <td class="text-end" style="color:#1677FF;">¥{{ "%.2f"|format(p.est_cost) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center text-muted py-4">暂无记录</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent calls -->
+<div class="card mt-3">
+    <div class="card-header">📋 最近调用记录</div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0" style="font-size:12px;">
+            <thead class="table-light">
+                <tr>
+                    <th>时间</th>
+                    <th>用户</th>
+                    <th>项目</th>
+                    <th>模块</th>
+                    <th class="text-end">输入</th>
+                    <th class="text-end">输出</th>
+                    <th>模型</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in recent_logs %}
+                <tr>
+                    <td class="text-muted">{{ log.created_at.strftime('%m-%d %H:%M') if log.created_at else '-' }}</td>
+                    <td><strong>{{ log.username }}</strong></td>
+                    <td>{{ log.project_name }}</td>
+                    <td class="text-muted">{{ log.module_l1 }}{{ ' / ' + log.module_l2 if log.module_l2 else '' }}</td>
+                    <td class="text-end">{{ "{:,}".format(log.prompt_tokens) }}</td>
+                    <td class="text-end">{{ "{:,}".format(log.completion_tokens) }}</td>
+                    <td class="text-muted">{{ log.model }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center text-muted py-4">暂无调用记录</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

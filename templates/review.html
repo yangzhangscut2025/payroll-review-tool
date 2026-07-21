@@ -55,7 +55,7 @@
     </div>
 
     <!-- Main content -->
-    <div class="col" style="min-width:0; max-width: calc(100% - 180px);" id="mainCol">
+    <div class="col" style="min-width:0;" id="mainCol">
         <!-- l2 scope -->
         {% if l2_description %}
         <div class="scope-bar mb-1" id="scopeBar">
@@ -242,21 +242,30 @@
         </div>
         <small class="text-muted">{{ pct|int }}% ({{ completed }}/{{ total_fields }})</small>
     </div>
-</div>
 
     <!-- Right: Prompt panel -->
-    <div class="col-auto" id="promptCol" style="display:none; width:350px;">
-        <div class="content-panel">
+    <div class="col-auto" id="promptCol" style="display:none; width:450px;">
+        <div class="content-panel" style="display:flex;flex-direction:column;height:calc(100vh - 120px);">
             <div class="panel-header d-flex justify-content-between">
                 <span class="fw-semibold small">🤖 AI 核对 Prompt</span>
                 <div>
                     <button class="btn btn-sm py-0 px-1" onclick="generatePrompt()" style="font-size:11px;">🔄 刷新</button>
                     <button class="btn btn-sm py-0 px-1" onclick="copyPrompt()" style="font-size:11px;">📋 复制</button>
+                    <button class="btn btn-sm py-0 px-1" onclick="sendToAI({{ project.id }})" style="font-size:11px;color:#1677FF;font-weight:600;">🚀 发送</button>
                     <button class="btn btn-sm py-0 px-1" onclick="togglePrompt()" style="font-size:14px;">×</button>
                 </div>
             </div>
-            <div class="panel-body p-2">
-                <textarea id="promptText" class="form-control" style="font-size:11px;height:calc(100vh - 200px);resize:none;white-space:pre-wrap;"></textarea>
+            <div class="panel-body p-2" style="flex:1;display:flex;flex-direction:column;overflow:hidden;max-height:none;">
+                <textarea id="promptText" class="form-control" style="font-size:11px;flex:0 0 45%;resize:none;white-space:pre-wrap;margin-bottom:6px;min-height:180px;"></textarea>
+                <div id="aiResponseArea" style="flex:1;overflow-y:auto;min-height:0;">
+                    <div id="aiResponseLoading" style="display:none;text-align:center;padding:16px;color:#1677FF;font-size:12px;">
+                        <span>⏳ 正在调用 AI 核对，请稍候…</span>
+                    </div>
+                    <div id="aiResponseContent" style="display:none;font-size:11px;white-space:pre-wrap;line-height:1.6;background:#F9FAFB;border:1px solid #E8E8E8;border-radius:4px;padding:8px;"></div>
+                    <div id="aiResponseEmpty" style="text-align:center;padding:16px;color:#8C8C8C;font-size:12px;">
+                        点击 <span style="color:#1677FF;">🚀 发送</span> 调用 AI 核对
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -269,11 +278,14 @@
 <script>
     const L2_LIST = {{ l2_list_json|safe }};
     const CURRENT_USER = "{{ username }}";
+    const CURRENT_L1 = "{{ current_l1 }}";
+    const CURRENT_L2 = "{{ current_l2 }}";
     const ASSIGNMENT_MAP = {};
     {% for l1, ma in assigned_map.items() %}
     ASSIGNMENT_MAP["{{ l1 }}"] = "{{ ma.assignee }}";
     {% endfor %}
     const PROJECT_OWNER = "{{ project.created_by }}";
+    const FORMAT_VERSION = "{{ project.format_version or 'v1' }}";
 </script>
-<script src="{{ url_for('static', filename='js/review.js') }}?v=28"></script>
+<script src="{{ url_for('static', filename='js/review.js') }}?v=35"></script>
 {% endblock %}

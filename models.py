@@ -81,3 +81,18 @@ class ReviewField(db.Model):
 
     def set_corrected_links(self, links):
         self.corrected_links = json.dumps(links, ensure_ascii=False)
+
+
+class AIUsageLog(db.Model):
+    __tablename__ = 'ai_usage_logs'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String(100), nullable=False)
+    project_id = db.Column(db.Integer, nullable=False)
+    project_name = db.Column(db.String(200), default='')
+    module_l1 = db.Column(db.String(200), default='')
+    module_l2 = db.Column(db.String(200), default='')
+    model = db.Column(db.String(50), default='deepseek-chat')
+    prompt_tokens = db.Column(db.Integer, default=0)
+    completion_tokens = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
