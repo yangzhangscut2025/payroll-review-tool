@@ -397,13 +397,16 @@ function navigateToIdx(projectId, idx) {
 }
 
 function togglePrompt() {
-    var panel = document.getElementById('promptPanel');
-    if (!panel) return;
-    if (panel.style.display === 'none') {
-        panel.style.display = '';
+    var col = document.getElementById('promptCol');
+    var mainCol = document.getElementById('mainCol');
+    if (!col || !mainCol) return;
+    if (col.style.display === 'none') {
+        col.style.display = '';
+        mainCol.style.maxWidth = 'calc(100% - 180px - 350px)';
         generatePrompt();
     } else {
-        panel.style.display = 'none';
+        col.style.display = 'none';
+        mainCol.style.maxWidth = 'calc(100% - 180px)';
     }
 }
 

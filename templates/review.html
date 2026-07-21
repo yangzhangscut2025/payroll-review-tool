@@ -55,7 +55,7 @@
     </div>
 
     <!-- Main content -->
-    <div class="col" style="min-width:0;">
+    <div class="col" style="min-width:0; max-width: calc(100% - 180px);" id="mainCol">
         <!-- l2 scope -->
         {% if l2_description %}
         <div class="scope-bar mb-1" id="scopeBar">
@@ -227,21 +227,6 @@
         </div>
         {% endfor %}
 
-        <!-- AI Prompt Panel -->
-        <div class="content-panel mb-2" id="promptPanel" style="display:none;">
-            <div class="panel-header d-flex justify-content-between">
-                <span class="fw-semibold small">🤖 AI 核对 Prompt</span>
-                <div>
-                    <button class="btn btn-sm py-0 px-1" onclick="generatePrompt()" style="font-size:11px;">🔄 刷新</button>
-                    <button class="btn btn-sm py-0 px-1" onclick="copyPrompt()" style="font-size:11px;">📋 复制</button>
-                    <button class="btn btn-sm py-0 px-1" onclick="document.getElementById('promptPanel').style.display='none'" style="font-size:14px;">×</button>
-                </div>
-            </div>
-            <div class="panel-body p-2">
-                <textarea id="promptText" class="form-control" style="font-size:11px;height:300px;resize:vertical;white-space:pre-wrap;"></textarea>
-            </div>
-        </div>
-
         <!-- Navigation -->
         <div class="d-flex justify-content-between mt-2">
             <a href="{{ url_for('review.review_workspace', project_id=project.id, l2=l2_index-1) }}"
@@ -256,6 +241,24 @@
             <div class="progress-bar" style="width:{{ pct|int }}%"></div>
         </div>
         <small class="text-muted">{{ pct|int }}% ({{ completed }}/{{ total_fields }})</small>
+    </div>
+</div>
+
+    <!-- Right: Prompt panel -->
+    <div class="col-auto" id="promptCol" style="display:none; width:350px;">
+        <div class="content-panel">
+            <div class="panel-header d-flex justify-content-between">
+                <span class="fw-semibold small">🤖 AI 核对 Prompt</span>
+                <div>
+                    <button class="btn btn-sm py-0 px-1" onclick="generatePrompt()" style="font-size:11px;">🔄 刷新</button>
+                    <button class="btn btn-sm py-0 px-1" onclick="copyPrompt()" style="font-size:11px;">📋 复制</button>
+                    <button class="btn btn-sm py-0 px-1" onclick="togglePrompt()" style="font-size:14px;">×</button>
+                </div>
+            </div>
+            <div class="panel-body p-2">
+                <textarea id="promptText" class="form-control" style="font-size:11px;height:calc(100vh - 200px);resize:none;white-space:pre-wrap;"></textarea>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
