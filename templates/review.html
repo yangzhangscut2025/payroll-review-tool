@@ -16,6 +16,7 @@
         <small class="ms-2 text-muted">校验人: <strong>{{ assigned_map.get(current_l1).assignee if assigned_map.get(current_l1) else '待分配' }}</strong></small>
     </div>
     <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-primary py-0" style="font-size:11px;" onclick="togglePrompt()">🤖 Prompt</button>
         {% set is_mine = (assigned_map.get(current_l1) and assigned_map[current_l1].assignee == username) or project.created_by == username %}
         <span class="badge" style="background:{{ '#36cf5066' if is_mine else '#ffb70045' }};color:#fff;font-size:11px;">
             {{ '我的模块' if is_mine else '只读' }}
@@ -225,6 +226,21 @@
             </div>
         </div>
         {% endfor %}
+
+        <!-- AI Prompt Panel -->
+        <div class="content-panel mb-2" id="promptPanel" style="display:none;">
+            <div class="panel-header d-flex justify-content-between">
+                <span class="fw-semibold small">🤖 AI 核对 Prompt</span>
+                <div>
+                    <button class="btn btn-sm py-0 px-1" onclick="generatePrompt()" style="font-size:11px;">🔄 刷新</button>
+                    <button class="btn btn-sm py-0 px-1" onclick="copyPrompt()" style="font-size:11px;">📋 复制</button>
+                    <button class="btn btn-sm py-0 px-1" onclick="document.getElementById('promptPanel').style.display='none'" style="font-size:14px;">×</button>
+                </div>
+            </div>
+            <div class="panel-body p-2">
+                <textarea id="promptText" class="form-control" style="font-size:11px;height:300px;resize:vertical;white-space:pre-wrap;"></textarea>
+            </div>
+        </div>
 
         <!-- Navigation -->
         <div class="d-flex justify-content-between mt-2">

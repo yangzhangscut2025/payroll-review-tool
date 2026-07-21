@@ -396,7 +396,89 @@ function navigateToIdx(projectId, idx) {
     window.location.href = '/projects/' + projectId + '/review?l2=' + idx;
 }
 
-function toggleSidebar() {
+function togglePrompt() {
+    var panel = document.getElementById('promptPanel');
+    if (!panel) return;
+    if (panel.style.display === 'none') {
+        panel.style.display = '';
+        generatePrompt();
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function generatePrompt() {
+    var promptTemplate = document.getElementById('promptText');
+    if (!promptTemplate) return;
+
+    // Get current active pair
+    var activeTab = document.querySelector('.pair-tab.active');
+    var pairIdx = activeTab ? activeTab.getAttribute('data-pair') : '0';
+    var panel = document.getElementById('pairPanel' + pairIdx);
+    if (!panel) return;
+
+    // Get content text
+    var contentView = panel.querySelector('.content-view');
+    var contentText = contentView ? (contentView.textContent || '').trim() : '';
+
+    // Get reference URLs
+    var refTextEl = panel.querySelector('.ref-text');
+    var urls = [];
+    if (refTextEl) {
+        var dataUrls = refTextEl.getAttribute('data-urls');
+        if (dataUrls) {
+            try { urls = JSON.parse(dataUrls); } catch(e) {}
+        }
+    }
+
+    var prompt = '【任务】\n请根据我提供的有效链接，逐条核对以下信息的准确性。\n\n';
+    prompt += '【核对规则】\n';
+    prompt += '一、逐项判断标准\n';
+    prompt += '判断结论\t适用情形\n';
+    prompt += '正确\t链接原文能完整支持该信息\n';
+    prompt += '错误\t信息与链接原文矛盾、数据有误、错误引用条文\n';
+    prompt += '错误+缺漏\t信息同时存在错误和遗漏\n';
+    prompt += '缺漏\t核心正确，但漏掉了关键限定条件\n';
+    prompt += '未找到\t在所有链接中均无直接原文依据\n';
+    prompt += '推断成立\t无直接原文但可通过多条链接组合推断\n\n';
+    prompt += '二、拆分处理\n';
+    prompt += '● 如一条信息包含多个独立主张，需逐项拆分判断\n\n';
+    prompt += '三、数据核验\n';
+    prompt += '● 优先核验法律条款编号、日期、数字比例等硬性数据\n\n';
+    prompt += '四、上下文检查\n';
+    prompt += '● 检查是否存在过度泛化，补充原文限定条件\n\n';
+    prompt += '五、链接矛盾处理\n';
+    prompt += '● 以权威性更高、时效性更新的来源为准\n\n';
+    prompt += '六、否定性信息记录\n';
+    prompt += '● 判断为"未找到"或"错误"，需指出"该内容未出现在链接X中"\n\n';
+    prompt += '七、推断成立的标注\n';
+    prompt += '● 说明推断链条\n\n';
+    prompt += '八、时效性风险标注\n';
+    prompt += '● 3年以上链接需标注"建议与最新法规交叉验证"\n\n';
+    prompt += '九、外部引用检查\n';
+    prompt += '● 超链接需说明是否可访问及内容匹配\n\n';
+    prompt += '【输出格式】\n';
+    prompt += '【信息序号X】\n 判断：[正确/错误/错误+缺漏/缺漏/未找到/推断成立]\n';
+    prompt += ' 溯源：[链接编号]\n 说明：\n\n';
+    prompt += '【待核对信息】\n' + contentText + '\n\n';
+    prompt += '【参考链接】\n';
+    for (var i = 0; i < urls.length; i++) {
+        prompt += '链接' + (i+1) + '：' + urls[i] + '\n';
+    }
+
+    promptTemplate.value = prompt;
+}
+
+function copyPrompt() {
+    var textarea = document.getElementById('promptText');
+    if (!textarea) return;
+    textarea.select();
+    document.execCommand('copy');
+    var btn = event.target;
+    var orig = btn.textContent;
+    btn.textContent = '✓ 已复制';
+    setTimeout(function() { btn.textContent = orig; }, 2000);
+}
     var col = document.getElementById('sidebarCol');
     var tree = document.getElementById('sidebarTree');
     var btn = document.getElementById('sidebarToggleBtn');
