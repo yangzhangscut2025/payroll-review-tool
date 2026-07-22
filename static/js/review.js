@@ -450,12 +450,13 @@ function generatePrompt() {
 
     // Get reference URLs — v2 merges all ref panels, v1 uses current pair only
     var urls = [];
-    if (FORMAT_VERSION === 'v2') {
-        // Collect links from both 官方网站 + 权威网站
-        var pairsData = [
-            {label: '官方网站', panelId: 'pairPanel0'},
-            {label: '权威网站', panelId: 'pairPanel1'}
-        ];
+    if (FORMAT_VERSION === 'v2' || FORMAT_VERSION === 'v3') {
+        // Collect links from all reference panels
+        var pairsData = (FORMAT_VERSION === 'v3')
+            ? [{label: '参考依据（官方）', panelId: 'pairPanel0'},
+               {label: '参考依据（行业权威）', panelId: 'pairPanel1'}]
+            : [{label: '官方网站', panelId: 'pairPanel0'},
+               {label: '权威网站', panelId: 'pairPanel1'}];
         var linkIdx = 1;
         for (var p = 0; p < pairsData.length; p++) {
             var panel = document.getElementById(pairsData[p].panelId);
@@ -512,7 +513,7 @@ function generatePrompt() {
     prompt += ' 溯源：[链接编号]\n 说明：\n';
     prompt += '【待核对信息】\n' + contentText + '\n';
     prompt += '【参考链接】\n';
-    if (FORMAT_VERSION === 'v2') {
+    if (FORMAT_VERSION === 'v2' || FORMAT_VERSION === 'v3') {
         for (var i = 0; i < urls.length; i++) {
             prompt += '链接' + urls[i].num + '（' + urls[i].source + '）：' + urls[i].url + '\n';
         }

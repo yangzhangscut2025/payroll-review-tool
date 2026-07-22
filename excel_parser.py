@@ -24,12 +24,28 @@ V2_REVIEW_COLUMNS = [
     '官方规则', '行业通用', '官方网站', '权威网站',
 ]
 
+# V3 格式（10列，2对，列名同 v1）
+V3_REQUIRED_COLUMNS = [
+    'l1_标题', 'l1_说明', 'l2_标题', 'l2_说明',
+    '实务内容（官方）', '实务内容（行业通用）',
+    '参考依据（官方）', '参考依据（行业权威）',
+    '状态', None,
+]
+
+V3_REVIEW_COLUMNS = [
+    '实务内容（官方）', '实务内容（行业通用）',
+    '参考依据（官方）', '参考依据（行业权威）',
+]
+
 
 def detect_format(headers):
     """根据表头自动识别格式版本。"""
     first = headers[0] if headers else ''
     if first == '标题Ⅰ':
         return 'v2'
+    # v3: 10列，第5列是"实务内容（官方）"且无"实务内容（内部口径）"
+    if len(headers) >= 8 and headers[4] == '实务内容（官方）' and '实务内容（内部口径）' not in headers:
+        return 'v3'
     return 'v1'
 
 
@@ -61,6 +77,9 @@ def parse_excel(filepath, project_id, db):
     if fmt == 'v2':
         required = V2_REQUIRED_COLUMNS
         review_cols = V2_REVIEW_COLUMNS
+    elif fmt == 'v3':
+        required = V3_REQUIRED_COLUMNS
+        review_cols = V3_REVIEW_COLUMNS
     else:
         required = V1_REQUIRED_COLUMNS
         review_cols = V1_REVIEW_COLUMNS
@@ -94,9 +113,9 @@ def parse_excel(filepath, project_id, db):
         if not row_has_data:
             continue
 
-        # V1: l1=col1, l2=col3; V2: l1=col1, l2=col2
+        # V1/V3: l1=col1, l2=col3; V2: l1=col1, l2=col2
         l1_col = 1
-        l2_col = 3 if fmt == 'v1' else 2
+        l2_col = 3 if fmt in ('v1', 'v3') else 2
 
         l1_title = ws.cell(row=row, column=l1_col).value
         if not l1_title:

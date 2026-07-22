@@ -40,7 +40,7 @@ def _fallback_users():
         {'english': 'Hailey', 'chinese': '吴敏', 'role': '校验人', 'display': 'Hailey (吴敏)'},
         {'english': 'kevin', 'chinese': '江学文', 'role': '校验人', 'display': 'kevin (江学文)'},
         {'english': 'Leon', 'chinese': '郑泽聪', 'role': '校验人', 'display': 'Leon (郑泽聪)'},
-        {'english': 'Mercury', 'chinese': '刘皓文', 'role': '校验人', 'display': 'Mercury (刘皓文)'},
+        {'english': 'Mercury', 'chinese': '刘皓文', 'role': '负责人', 'display': 'Mercury (刘皓文)'},
         {'english': 'Touyi', 'chinese': '余炯宜', 'role': '校验人', 'display': 'Touyi (余炯宜)'},
         {'english': 'Yee', 'chinese': '陈易蔓', 'role': '校验人', 'display': 'Yee (陈易蔓)'},
     ]

@@ -145,8 +145,7 @@
                     {% endif %}
 
                     {% if project.file_path %}
-                    <a href="{{ url_for('export.export_result', project_id=project.id) }}"
-                       class="btn btn-outline-success">📥 导出审阅结果</a>
+                    <button class="btn btn-outline-success" onclick="showExportPreview({{ project.id }})">📥 导出审阅结果</button>
                     {% endif %}
 
                     {% if project.created_by == username %}
@@ -188,7 +187,116 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Export Preview Modal -->
+<div class="modal fade" id="exportPreviewModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">📥 导出预览</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="exportPreviewBody">
+                <div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 加载中...</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                <button class="btn btn-sm btn-primary" id="btnConfirmExport" onclick="startExport()">确认导出</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export Progress Modal -->
+<div class="modal fade" id="exportProgressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">📥 正在导出...</h6>
+            </div>
+            <div class="modal-body text-center">
+                <div class="progress mb-2" style="height:20px;">
+                    <div class="progress-bar" id="exportProgressBar" style="width:0%;">0%</div>
+                </div>
+                <small class="text-muted" id="exportProgressDetail">准备中...</small>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+let currentProjectId = null;
+let progressTimer = null;
+
+async function showExportPreview(projectId) {
+    currentProjectId = projectId;
+    var modal = new bootstrap.Modal(document.getElementById('exportPreviewModal'));
+    modal.show();
+    var body = document.getElementById('exportPreviewBody');
+    body.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 加载中...</div>';
+    try {
+        var resp = await fetch('/api/projects/' + projectId + '/export-preview', {method:'POST'});
+        var data = await resp.json();
+        if (!data.ok) { body.innerHTML = '<div class="alert alert-danger mb-0">'+data.error+'</div>'; return; }
+        var html = '<table class="table table-sm mb-2"><thead><tr><th>Sheet</th><th>语言</th><th>翻译</th></tr></thead><tbody>';
+        for (var i = 0; i < data.sheets.length; i++) {
+            var s = data.sheets[i];
+            html += '<tr><td>'+s.name+'</td><td>'+s.label+'</td><td>'+(s.translate?'<span class="text-primary">✅ API翻译</span>':'<span class="text-muted">原文</span>')+'</td></tr>';
+        }
+        html += '</tbody></table>';
+        html += '<div class="row g-2 small">';
+        html += '<div class="col-6">审阅字段：<strong>'+data.total_fields+'</strong></div>';
+        html += '<div class="col-6">需翻译：<strong>'+data.translate_items+'</strong> 条</div>';
+        html += '<div class="col-6">估算 Token：<strong>'+data.est_tokens.toLocaleString()+'</strong></div>';
+        html += '<div class="col-6">估算费用：<strong style="color:#1677FF;">¥'+data.est_cost+'</strong></div>';
+        html += '<div class="col-12">预计耗时：<strong>'+data.est_time_seconds+'</strong> 秒</div>';
+        html += '</div>';
+        body.innerHTML = html;
+    } catch(e) {
+        body.innerHTML = '<div class="alert alert-danger mb-0">加载失败：'+e.message+'</div>';
+    }
+}
+
+async function startExport() {
+    if (!currentProjectId) return;
+    bootstrap.Modal.getInstance(document.getElementById('exportPreviewModal')).hide();
+    var progressModal = new bootstrap.Modal(document.getElementById('exportProgressModal'));
+    progressModal.show();
+    try {
+        var resp = await fetch('/api/projects/' + currentProjectId + '/export-start', {method:'POST'});
+        var data = await resp.json();
+        if (!data.ok) { alert(data.error); progressModal.hide(); return; }
+        pollProgress(currentProjectId, data.task_id);
+    } catch(e) {
+        alert('启动导出失败：'+e.message);
+        progressModal.hide();
+    }
+}
+
+function pollProgress(projectId, taskId) {
+    progressTimer = setInterval(async function() {
+        try {
+            var resp = await fetch('/api/projects/' + projectId + '/export-progress/' + taskId);
+            var data = await resp.json();
+            var bar = document.getElementById('exportProgressBar');
+            var detail = document.getElementById('exportProgressDetail');
+            bar.style.width = data.percentage + '%';
+            bar.textContent = data.percentage + '%';
+            detail.textContent = data.detail + ' (' + data.sheet + ')';
+            if (data.status === 'done') {
+                clearInterval(progressTimer);
+                window.location.href = '/api/projects/' + projectId + '/export-download/' + taskId;
+                setTimeout(function() {
+                    bootstrap.Modal.getInstance(document.getElementById('exportProgressModal')).hide();
+                }, 1500);
+            } else if (data.status === 'error') {
+                clearInterval(progressTimer);
+                detail.textContent = '❌ ' + (data.error || '导出失败');
+                detail.style.color = '#C00000';
+            }
+        } catch(e) {}
+    }, 1000);
+}
+
 function toggleEditProject() {
     var view = document.getElementById('projectInfoView');
     var edit = document.getElementById('projectInfoEdit');

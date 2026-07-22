@@ -25,6 +25,10 @@ PAIRS = {
         {'content': '官方规则', 'ref': '官方网站', 'label': '官方规则'},
         {'content': '行业通用', 'ref': '权威网站', 'label': '行业通用'},
     ],
+    'v3': [
+        {'content': '实务内容（官方）', 'ref': '参考依据（官方）', 'label': '官方'},
+        {'content': '实务内容（行业通用）', 'ref': '参考依据（行业权威）', 'label': '行业通用'},
+    ],
 }
 
 
@@ -150,8 +154,8 @@ def review_workspace(project_id):
         wb = openpyxl.load_workbook(project.file_path, data_only=True)
         ws = wb.active
         fmt = project.format_version or 'v1'
-        l2_col = 3 if fmt == 'v1' else 2
-        desc_col = 4 if fmt == 'v1' else 3
+        l2_col = 3 if fmt in ('v1', 'v3') else 2
+        desc_col = 4 if fmt in ('v1', 'v3') else 3
         for row in range(2, ws.max_row + 1):
             l1_val = str(ws.cell(row=row, column=1).value or '').strip()
             l2_val = str(ws.cell(row=row, column=l2_col).value or '').strip()
