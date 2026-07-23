@@ -51,4 +51,6 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    from waitress import serve
+    serve(app, host='0.0.0.0', port=5000, threads=16)
+    print('Waitress server running on http://0.0.0.0:5000')

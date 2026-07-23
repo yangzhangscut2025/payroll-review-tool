@@ -44,6 +44,8 @@ def upload_excel(project_id):
 
     # Parse and initialize review fields
     try:
+        # Clean old review data before re-parsing
+        ReviewField.query.filter_by(project_id=project.id).delete()
         result = parse_excel(filepath, project.id, db)
         project.total_modules = result['l1_count']
         project.completed_modules = 0

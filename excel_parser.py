@@ -150,6 +150,11 @@ def parse_excel(filepath, project_id, db):
                 changed_content=original_str,
                 status='待审阅',
             )
+            # Extract URLs from content on initial parse
+            if original_str:
+                import re
+                urls = re.findall(r'https?://[^\s<>"\')\]]+', original_str)
+                rf.set_link_urls([u.rstrip('.,;:!?') for u in urls])
             db.session.add(rf)
             total_fields += 1
 

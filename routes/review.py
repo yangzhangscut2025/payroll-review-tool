@@ -119,9 +119,11 @@ def review_workspace(project_id):
                 ref_field = f
 
         if content_field:
-            content_field.link_urls_list = url_extract(content_field.original_content)
+            urls = content_field.get_link_urls()
+            content_field.link_urls_list = urls if urls else url_extract(content_field.original_content)
         if ref_field:
-            ref_field.link_urls_list = url_extract(ref_field.original_content)
+            urls = ref_field.get_link_urls()
+            ref_field.link_urls_list = urls if urls else url_extract(ref_field.original_content)
             ref_field.link_statuses_dict = ref_field.get_link_statuses()
             ref_field.corrected_links_dict = ref_field.get_corrected_links()
 
@@ -211,6 +213,8 @@ def save_field(field_id):
         field.internal_note = data['internal_note']
     if 'changed_content' in data:
         field.changed_content = data['changed_content']
+        # Re-extract URLs from changed content and persist
+        field.set_link_urls(url_extract(field.changed_content))
     if 'link_statuses' in data:
         field.set_link_statuses(data['link_statuses'])
     if 'corrected_links' in data:

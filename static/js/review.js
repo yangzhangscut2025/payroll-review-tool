@@ -192,7 +192,7 @@ window.addEventListener('beforeunload', function() {
 
 function initAllRefTexts() {
     document.querySelectorAll('.ref-text').forEach(function(el) {
-        if (el.getAttribute('data-original')) renderRefText(el);
+        renderRefText(el);
     });
 }
 
@@ -640,9 +640,10 @@ function saveViewState() {
 }
 
 function restoreViewState() {
-    // 恢复 Tab
+    // 恢复 Tab（校验索引是否有效）
     var savedTab = sessionStorage.getItem('activePairTab');
-    if (savedTab && savedTab !== '0') {
+    var tabs = document.querySelectorAll('.pair-tab');
+    if (savedTab && parseInt(savedTab) < tabs.length) {
         switchPair(parseInt(savedTab));
     }
     // 恢复侧边栏
