@@ -21,7 +21,9 @@ Thumbs.db
 # Secrets
 .env
 
-# Personal notes
+# Database
+data.db
+
 # Personal notes
 项目复盘.md
 向量检索踩坑记录.md

@@ -148,13 +148,16 @@ TAG_PATTERN = re.compile(r'(<[^>]+>)')
 
 
 def _protect_html(text):
-    """Replace HTML tags with placeholders {__Tn__}, return (protected_text, tag_map)."""
+    """Replace HTML tags with placeholders {__Tn__}, return (protected_text, tag_map).
+    Tags are sorted by length (longest first) to avoid partial replacement of nested tags."""
     tags = TAG_PATTERN.findall(text)
     tag_map = {}
     for i, tag in enumerate(tags):
         placeholder = f'{{__T{i}__}}'
-        text = text.replace(tag, placeholder, 1)
         tag_map[placeholder] = tag
+    # Replace longest placeholders first to avoid partial matches
+    for placeholder, tag in sorted(tag_map.items(), key=lambda x: -len(x[1])):
+        text = text.replace(tag, placeholder, 1)
     return text, tag_map
 
 
@@ -167,9 +170,11 @@ def _restore_html(text, tag_map):
 
 def _translate_batch(items, target_lang, api_key, api_url, model, progress_callback=None):
     """Translate a list of Chinese texts to target language using DeepSeek API.
-    HTML tags are protected with placeholders during translation."""
+    HTML tags are protected with placeholders during translation.
+    Returns (translated_list, total_usage_dict)."""
+    total_usage = {'prompt_tokens': 0, 'completion_tokens': 0}
     if not items or not api_key:
-        return items
+        return items, total_usage
 
     # Protect HTML tags in each item
     protected_items = []
@@ -214,6 +219,10 @@ def _translate_batch(items, target_lang, api_key, api_url, model, progress_callb
             resp.raise_for_status()
             result = resp.json()
             content = result['choices'][0]['message']['content'].strip()
+            # Accumulate token usage for external logging
+            usage = result.get('usage', {})
+            total_usage['prompt_tokens'] += usage.get('prompt_tokens', 0)
+            total_usage['completion_tokens'] += usage.get('completion_tokens', 0)
             if content.startswith('```'):
                 content = content.split('\n', 1)[1]
                 if content.endswith('```'):
@@ -230,12 +239,15 @@ def _translate_batch(items, target_lang, api_key, api_url, model, progress_callb
             result.append(_restore_html(text, tag_maps[i]))
         else:
             result.append(text)
-    return result
+    return result, total_usage
 
 
 def generate_review_excel(input_path, output_path, review_map, format_version='v1', progress_callback=None):
     """Generate the reviewed Excel file — processes ALL sheets.
-    progress_callback(pct, sheet_name, detail) called during processing."""
+    progress_callback(pct, sheet_name, detail) called during processing.
+    Returns (warnings_list, total_usage_dict)."""
+    warnings = []
+    total_usage = {'prompt_tokens': 0, 'completion_tokens': 0}
     _state = {'sheet': ''}
 
     def _progress(pct, detail):
@@ -272,15 +284,22 @@ def generate_review_excel(input_path, output_path, review_map, format_version='v
                 for sheet_name in translate_sheets:
                     lang = LANG_MAP.get(sheet_name, sheet_name)
                     _progress(10, f'翻译{lang}...')
-                    translated_texts = _translate_batch(
+                    translated_texts, usage = _translate_batch(
                         texts, lang, api_key, api_url, model,
                         progress_callback=lambda i, t: _progress(
                             10 + int(80 * (i / t) / len(translate_sheets)),
                             f'翻译{lang} {i}/{t}'
                         ) if progress_callback else None
                     )
+                    total_usage['prompt_tokens'] += usage['prompt_tokens']
+                    total_usage['completion_tokens'] += usage['completion_tokens']
                     if len(translated_texts) == len(texts):
                         translations[sheet_name] = dict(zip(keys, translated_texts))
+                    else:
+                        warnings.append(f'{sheet_name} 翻译数量不匹配，部分内容保持中文')
+        else:
+            for sheet_name in translate_sheets:
+                warnings.append(f'{sheet_name} 未配置API Key，校验列保持中文原文')
 
     # Only process Chinese and English sheets; skip local-language sheets
     target_sheets = ['zh_Chinese'] + list(LANG_MAP.keys())
@@ -346,6 +365,7 @@ def generate_review_excel(input_path, output_path, review_map, format_version='v
 
     wb.save(output_path)
     wb.close()
+    return warnings, total_usage
 
 
 def _apply_html_to_cell(cell, html_text):

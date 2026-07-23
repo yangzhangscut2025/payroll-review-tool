@@ -35,7 +35,8 @@ def upload_excel(project_id):
 
     # Save file
     ext = file.filename.rsplit('.', 1)[1].lower()
-    save_name = f"project_{project.id}.{ext}"
+    ts = __import__('time').strftime('%Y%m%d_%H%M%S')
+    save_name = f"project_{project.id}_{ts}.{ext}"
     filepath = os.path.join(Config.UPLOAD_FOLDER, save_name)
     file.save(filepath)
     project.file_path = filepath

@@ -118,10 +118,9 @@ def delete_project(project_id):
     if project.created_by != username:
         return "无权限", 403
 
-    # Physical delete
-    ReviewField.query.filter_by(project_id=project.id).delete()
-    ModuleAssignment.query.filter_by(project_id=project.id).delete()
-    db.session.delete(project)
+    # Soft delete
+    project.deleted_at = db.func.now()
+    project.status = '已删除'
     db.session.commit()
 
     return redirect(url_for('projects.project_list'))

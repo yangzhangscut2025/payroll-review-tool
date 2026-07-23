@@ -12,6 +12,26 @@ export_bp = Blueprint('export', __name__)
 # In-memory progress store (cleared on restart)
 _export_progress = {}
 
+TASK_TTL = 3600  # auto-clean tasks older than 1 hour
+
+
+def _cleanup_tasks():
+    """Remove expired tasks from progress store."""
+    import time
+    now = time.time()
+    expired = [tid for tid, info in _export_progress.items()
+               if info.get('_created', 0) < now - TASK_TTL]
+    for tid in expired:
+        _export_progress.pop(tid, None)
+
+
+def _find_active_task(project_id):
+    """Check if there's already an active export for this project."""
+    for tid, info in _export_progress.items():
+        if info.get('project_id') == project_id and info['status'] == 'processing':
+            return tid
+    return None
+
 
 @export_bp.route('/api/projects/<int:project_id>/export-preview', methods=['POST'])
 def export_preview(project_id):
@@ -94,6 +114,13 @@ def export_start(project_id):
     output_path = os.path.join(os.path.dirname(project.file_path), output_name)
 
     task_id = uuid.uuid4().hex[:12]
+
+    # Check for existing active export
+    existing = _find_active_task(project_id)
+    if existing:
+        return jsonify({'ok': True, 'task_id': existing, 'resumed': True})
+
+    _cleanup_tasks()
     _export_progress[task_id] = {
         'status': 'processing',
         'percentage': 0,
@@ -102,6 +129,8 @@ def export_start(project_id):
         'output_path': output_path,
         'output_name': output_name,
         'error': None,
+        'project_id': project_id,
+        '_created': __import__('time').time(),
     }
 
     def progress_callback(pct, sheet, detail):
@@ -116,17 +145,36 @@ def export_start(project_id):
 
     def run_export():
         try:
-            generate_review_excel(
+            warnings, usage = generate_review_excel(
                 project.file_path, output_path, review_map,
                 project.format_version or 'v1',
                 progress_callback=progress_callback,
             )
             _export_progress[task_id]['status'] = 'done'
             _export_progress[task_id]['percentage'] = 100
-            _export_progress[task_id]['detail'] = '导出完成'
+            detail = '导出完成'
+            if warnings:
+                detail += ' (⚠️ ' + '; '.join(warnings) + ')'
+            _export_progress[task_id]['detail'] = detail
             with app.app_context():
-                project.output_path = output_path
-                project.updated_at = db.func.now()
+                from models import db, Project, AIUsageLog
+                p = db.session.get(Project, project_id)
+                if p:
+                    p.output_path = output_path
+                    p.updated_at = db.func.now()
+                # Log translation usage
+                if usage['prompt_tokens'] > 0 or usage['completion_tokens'] > 0:
+                    log = AIUsageLog(
+                        username=username,
+                        project_id=project_id,
+                        project_name=project.name,
+                        module_l1='export',
+                        module_l2='translation',
+                        model=current_app.config.get('DEEPSEEK_MODEL', 'deepseek-chat'),
+                        prompt_tokens=usage['prompt_tokens'],
+                        completion_tokens=usage['completion_tokens'],
+                    )
+                    db.session.add(log)
                 db.session.commit()
         except Exception as e:
             _export_progress[task_id]['status'] = 'error'
@@ -149,6 +197,8 @@ def export_progress(project_id, task_id):
     info = _export_progress.get(task_id)
     if not info:
         return jsonify({'error': '任务不存在或已过期'}), 404
+
+    _cleanup_tasks()
 
     return jsonify({
         'status': info['status'],
