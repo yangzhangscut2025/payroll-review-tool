@@ -65,13 +65,37 @@ def export_preview(project_id):
             })
     wb.close()
 
-    # Count translatable items
+    # Count translatable items (only fields with actual review marks)
+    import re
+    _mark_pat = re.compile(r'<(span style|/s>|s>|strong>|/strong>)')
+    def _has_marks(t):
+        return bool(_mark_pat.search(t)) if t else False
     translate_items = sum(1 for rf in review_map.values()
-                          if rf.changed_content and rf.changed_content.strip())
+                          if rf.changed_content and _has_marks(rf.changed_content))
 
-    # Estimate tokens and cost
+    # Estimate tokens and cost (changed fields + English reference)
     est_chars = sum(len(rf.changed_content) for rf in review_map.values()
-                    if rf.changed_content)
+                    if rf.changed_content and _has_marks(rf.changed_content))
+    # Add English reference text (same fields, from English sheet)
+    en_chars = 0
+    if any(s['translate'] for s in sheets):
+        import openpyxl
+        en_wb = openpyxl.load_workbook(project.file_path, data_only=True)
+        if 'en_English' in en_wb.sheetnames:
+            en_ws = en_wb['en_English']
+            en_headers = [str(en_ws.cell(row=1, column=c).value or '').strip() for c in range(1, en_ws.max_column + 1)]
+            review_cols = ['实务内容（官方）', '实务内容（行业通用）', '参考依据（官方）', '参考依据（行业权威）',
+                           '官方规则', '行业通用', '官方网站', '权威网站']
+            en_col_map = {h: i+1 for i, h in enumerate(en_headers) if h in review_cols}
+            for rf in review_map.values():
+                if rf.changed_content and _has_marks(rf.changed_content):
+                    col = en_col_map.get(rf.field_type)
+                    if col:
+                        val = en_ws.cell(row=rf.row_index, column=col).value
+                        if val:
+                            en_chars += len(str(val))
+        en_wb.close()
+    est_chars += en_chars
     est_tokens = int(est_chars * 1.5)  # rough: 1.5 tokens per Chinese char
     translate_sheets = sum(1 for s in sheets if s['translate'])
     total_tokens = est_tokens * translate_sheets
@@ -230,6 +254,98 @@ def export_download(project_id, task_id):
 
 
 @export_bp.route('/projects/<int:project_id>/export')
-def export_result(project_id):
-    """Legacy: redirect to project detail page (new flow uses async export)."""
-    return redirect(url_for('projects.project_detail', project_id=project_id))
+def export_quick(project_id):
+    """Quick export: direct download, no translation, Chinese sheet only."""
+    username = session.get('username')
+    if not username:
+        return redirect(url_for('auth.login_page'))
+
+    project = Project.query.get_or_404(project_id)
+    if not project.file_path:
+        return "请先上传Excel文件", 400
+
+    fields = ReviewField.query.filter_by(project_id=project.id).all()
+    if not fields:
+        return "请先进行审阅", 400
+
+    review_map = {}
+    for f in fields:
+        review_map[(f.row_index, f.field_type)] = f
+
+    safe_name = project.name.replace('/', '_').replace('\\', '_')
+    date_str = datetime.now().strftime('%Y%m%d')
+    output_name = f"{safe_name}_快速导出_{date_str}.xlsx"
+    output_path = os.path.join(os.path.dirname(project.file_path), output_name)
+
+    import openpyxl
+    from copy import copy
+    from openpyxl.styles import PatternFill
+    from openpyxl.utils import get_column_letter
+    from excel_writer import REVIEW_COLUMNS, _apply_html_to_cell
+
+    review_cols = REVIEW_COLUMNS.get(project.format_version or 'v1', REVIEW_COLUMNS['v1'])
+    wb = openpyxl.load_workbook(project.file_path, data_only=True)
+
+    for ws in wb.worksheets:
+        if ws.title != 'zh_Chinese':
+            continue
+        headers = []
+        for col in range(1, ws.max_column + 1):
+            val = ws.cell(row=1, column=col).value
+            headers.append(str(val).strip() if val else '')
+
+        col_positions = {}
+        for h in headers:
+            if h in review_cols:
+                col_positions[h] = headers.index(h) + 1
+
+        sorted_cols = sorted(col_positions.items(), key=lambda x: x[1], reverse=True)
+
+        for field_type, base_col in sorted_cols:
+            insert_col = base_col + 1
+            ws.insert_cols(insert_col)
+            header_cell = ws.cell(row=1, column=insert_col)
+            header_cell.value = f"{field_type}_校验列"
+            orig_header = ws.cell(row=1, column=base_col)
+            header_cell.font = copy(orig_header.font)
+            header_cell.alignment = copy(orig_header.alignment)
+
+            for row in range(2, ws.max_row + 1):
+                key = (row, field_type)
+                if key in review_map:
+                    rf = review_map[key]
+                    cell = ws.cell(row=row, column=insert_col)
+                    bg = {'待审阅': 'F0F0F0', '已确认': '36cf50', '需修改': 'ffb700', '待讨论': '722ed1'}
+                    if rf.status != '待审阅':
+                        cell.fill = PatternFill(start_color=bg.get(rf.status, 'F0F0F0'),
+                                                end_color=bg.get(rf.status, 'F0F0F0'), fill_type='solid')
+                    content = rf.changed_content
+                    if content:
+                        # Format invalid links for reference fields
+                        if '参考' in field_type or '网站' in field_type:
+                            link_statuses = rf.get_link_statuses()
+                            corrected = rf.get_corrected_links()
+                            if link_statuses:
+                                notes = []
+                                for url, status in link_statuses.items():
+                                    if status in ('打不开', '内容不符', '已过时'):
+                                        marked = f'<span style="color:#C00000;"><s>{url}</s></span>'
+                                        if url in corrected:
+                                            marked += f' → {corrected[url]}'
+                                        if url in content:
+                                            content = content.replace(url, marked)
+                                        notes.append(f'[{status}] {url}' + (f' → {corrected[url]}' if url in corrected else ''))
+                                if notes:
+                                    content += '\n\n【链接状态】\n' + '\n'.join(notes)
+                        if '<' in content:
+                            _apply_html_to_cell(cell, content)
+                        else:
+                            cell.value = content
+
+        for col in range(1, ws.max_column + 1):
+            ws.column_dimensions[get_column_letter(col)].width = 25
+
+    wb.save(output_path)
+    wb.close()
+
+    return send_file(output_path, as_attachment=True, download_name=output_name)
