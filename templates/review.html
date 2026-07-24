@@ -45,7 +45,7 @@
                        class="tree-l2-item d-flex align-items-center {{ 'current' if is_current else '' }}"
                        data-l1="{{ l1_name }}">
                         <span class="text-truncate flex-grow-1">{{ l2_name }}</span>
-                        <span class="risk-dot" style="background:#F2F3F5;"></span>
+                        <span class="risk-dot" style="background:{{ l2_status.get(l1_name + '|' + l2_name, '#F2F3F5') }};"></span>
                     </a>
                     {% endfor %}
                 </div>

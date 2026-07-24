@@ -322,11 +322,7 @@ def generate_review_excel(input_path, output_path, review_map, format_version='v
 
                 # Read English original content for translation reference
                 en_refs = []
-                en_ws = None
-                for s in wb.worksheets:
-                    if s.title == 'en_English':
-                        en_ws = s
-                        break
+                en_ws = wb.worksheets[1] if len(wb.worksheets) > 1 else None
                 if en_ws:
                     en_headers = []
                     for col in range(1, en_ws.max_column + 1):
@@ -348,13 +344,12 @@ def generate_review_excel(input_path, output_path, review_map, format_version='v
                     en_refs = [''] * total_items
 
                 for sheet_name in translate_sheets:
-                    lang = LANG_MAP.get(sheet_name, sheet_name)
-                    _progress(10, f'翻译{lang}...')
+                    _progress(10, f'翻译英文...')
                     translated_texts, usage = _translate_batch(
-                        texts, en_refs, lang, api_key, api_url, model,
+                        texts, en_refs, '英文', api_key, api_url, model,
                         progress_callback=lambda i, t: _progress(
                             10 + int(80 * (i / t) / len(translate_sheets)),
-                            f'翻译{lang} {i}/{t}'
+                            f'翻译英文 {i}/{t}'
                         ) if progress_callback else None
                     )
                     total_usage['prompt_tokens'] += usage['prompt_tokens']
@@ -362,30 +357,33 @@ def generate_review_excel(input_path, output_path, review_map, format_version='v
                     if len(translated_texts) == len(texts):
                         translations[sheet_name] = dict(zip(keys, translated_texts))
                     else:
-                        # Best-effort: match as many as possible, fall back to original for the rest
                         matched = min(len(translated_texts), len(texts))
                         partial = dict(zip(keys[:matched], translated_texts[:matched]))
                         translations[sheet_name] = partial
-                        warnings.append(f'{sheet_name} 翻译 {matched}/{len(texts)} 条，其余保持中文')
+                        warnings.append(f'英文 sheet 翻译 {matched}/{len(texts)} 条，其余保持中文')
             else:
                 _progress(10, '无需翻译（无改动内容）')
         else:
-            for sheet_name in translate_sheets:
-                warnings.append(f'{sheet_name} 未配置API Key，校验列保持中文原文')
+            warnings.append('未配置API Key，英文 sheet 保持中文原文')
 
-    # Only process Chinese and English sheets; skip local-language sheets
-    target_sheets = ['zh_Chinese'] + list(LANG_MAP.keys())
-    total_sheets = len([s for s in wb.sheetnames if s in target_sheets])
-    sheet_idx = 0
+    # Process sheets by position: first = Chinese, second = English, rest = skip
+    target_indices = [0]  # Chinese sheet
+    en_sheet_idx = None
+    if len(wb.worksheets) > 1:
+        target_indices.append(1)  # English sheet
+        en_sheet_idx = 1
+    translate_sheets = [wb.sheetnames[1]] if en_sheet_idx is not None else []
 
-    for ws in wb.worksheets:
-        if ws.title not in target_sheets:
+    for ws_idx, ws in enumerate(wb.worksheets):
+        if ws_idx not in target_indices:
             continue
 
         _state['sheet'] = ws.title
-        sheet_idx += 1
+        is_translated = (ws_idx == en_sheet_idx)
+        total_targets = len(target_indices)
+        current_idx = target_indices.index(ws_idx) + 1
         base_pct = 90 if not translate_sheets else 10 + int(80 / len(translate_sheets)) * len(translate_sheets)
-        _progress(base_pct + int((sheet_idx / total_sheets) * (100 - base_pct)),
+        _progress(base_pct + int((current_idx / total_targets) * (100 - base_pct)),
                   f'写入{ws.title}...')
         headers = []
         for col in range(1, ws.max_column + 1):

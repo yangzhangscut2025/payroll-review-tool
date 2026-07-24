@@ -146,6 +146,7 @@
 
                     {% if project.file_path %}
                     <button class="btn btn-outline-success" onclick="showExportPreview({{ project.id }})">📥 导出审阅结果</button>
+                    <a href="/projects/{{ project.id }}/export" class="btn btn-outline-secondary btn-sm" onclick="return confirm('直接下载中文版审阅结果，不翻译。确定？')">⚡ 快速导出</a>
                     {% endif %}
 
                     {% if project.created_by == username %}
@@ -235,6 +236,11 @@ async function showExportPreview(projectId) {
     body.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 加载中...</div>';
     try {
         var resp = await fetch('/api/projects/' + projectId + '/export-preview', {method:'POST'});
+        if (!resp.ok) {
+            var errText = await resp.text();
+            body.innerHTML = '<div class="alert alert-danger mb-0">导出预览失败：' + (resp.status === 401 ? '请先登录' : errText || resp.status) + '</div>';
+            return;
+        }
         var data = await resp.json();
         if (!data.ok) { body.innerHTML = '<div class="alert alert-danger mb-0">'+data.error+'</div>'; return; }
         var html = '<table class="table table-sm mb-2"><thead><tr><th>Sheet</th><th>语言</th><th>翻译</th></tr></thead><tbody>';
@@ -245,7 +251,7 @@ async function showExportPreview(projectId) {
         html += '</tbody></table>';
         html += '<div class="row g-2 small">';
         html += '<div class="col-6">审阅字段：<strong>'+data.total_fields+'</strong></div>';
-        html += '<div class="col-6">需翻译：<strong>'+data.translate_items+'</strong> 条</div>';
+        html += '<div class="col-6">需翻译：<strong>'+data.translate_items+'</strong> 条（仅翻译已修改的内容）</div>';
         html += '<div class="col-6">估算 Token：<strong>'+data.est_tokens.toLocaleString()+'</strong></div>';
         html += '<div class="col-6">估算费用：<strong style="color:#1677FF;">¥'+data.est_cost+'</strong></div>';
         html += '<div class="col-12">预计耗时：<strong>'+data.est_time_seconds+'</strong> 秒</div>';
@@ -263,6 +269,7 @@ async function startExport() {
     progressModal.show();
     try {
         var resp = await fetch('/api/projects/' + currentProjectId + '/export-start', {method:'POST'});
+        if (!resp.ok) { alert('导出失败：' + resp.status); progressModal.hide(); return; }
         var data = await resp.json();
         if (!data.ok) { alert(data.error); progressModal.hide(); return; }
         pollProgress(currentProjectId, data.task_id);

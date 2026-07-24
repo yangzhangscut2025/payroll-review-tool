@@ -52,17 +52,14 @@ def export_preview(project_id):
     for f in fields:
         review_map[(f.row_index, f.field_type)] = f
 
-    # Check which sheets exist
+    # Check which sheets exist (by position: first = Chinese, second = English)
     import openpyxl
     wb = openpyxl.load_workbook(project.file_path, data_only=True)
     sheets = []
-    for name in wb.sheetnames:
-        if name == 'zh_Chinese' or name in LANG_MAP:
-            sheets.append({
-                'name': name,
-                'label': '中文' if name == 'zh_Chinese' else LANG_MAP.get(name, name),
-                'translate': name in LANG_MAP,
-            })
+    if wb.worksheets:
+        sheets.append({'name': wb.sheetnames[0], 'label': '中文', 'translate': False})
+    if len(wb.worksheets) > 1:
+        sheets.append({'name': wb.sheetnames[1], 'label': '英文', 'translate': True})
     wb.close()
 
     # Count translatable items (only fields with actual review marks)
@@ -81,8 +78,8 @@ def export_preview(project_id):
     if any(s['translate'] for s in sheets):
         import openpyxl
         en_wb = openpyxl.load_workbook(project.file_path, data_only=True)
-        if 'en_English' in en_wb.sheetnames:
-            en_ws = en_wb['en_English']
+        if len(en_wb.worksheets) > 1:
+            en_ws = en_wb.worksheets[1]
             en_headers = [str(en_ws.cell(row=1, column=c).value or '').strip() for c in range(1, en_ws.max_column + 1)]
             review_cols = ['实务内容（官方）', '实务内容（行业通用）', '参考依据（官方）', '参考依据（行业权威）',
                            '官方规则', '行业通用', '官方网站', '权威网站']
@@ -286,9 +283,9 @@ def export_quick(project_id):
     review_cols = REVIEW_COLUMNS.get(project.format_version or 'v1', REVIEW_COLUMNS['v1'])
     wb = openpyxl.load_workbook(project.file_path, data_only=True)
 
-    for ws in wb.worksheets:
-        if ws.title != 'zh_Chinese':
-            continue
+    # First sheet = Chinese (process), rest = skip
+    ws = wb.worksheets[0] if wb.worksheets else None
+    if ws:
         headers = []
         for col in range(1, ws.max_column + 1):
             val = ws.cell(row=1, column=col).value
@@ -321,7 +318,6 @@ def export_quick(project_id):
                                                 end_color=bg.get(rf.status, 'F0F0F0'), fill_type='solid')
                     content = rf.changed_content
                     if content:
-                        # Format invalid links for reference fields
                         if '参考' in field_type or '网站' in field_type:
                             link_statuses = rf.get_link_statuses()
                             corrected = rf.get_corrected_links()
