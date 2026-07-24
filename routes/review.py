@@ -145,9 +145,24 @@ def review_workspace(project_id):
 
     # Get field statuses for tree
     field_statuses = {}
+    l2_status = {}  # l1|l2 -> overall status color
+    l2_fields_count = {}  # l1|l2 -> {total, completed}
     for f in fields:
         key = f"{f.module_l1}|{f.module_l2}|{f.field_type}"
         field_statuses[key] = f.status
+        l2_key = f"{f.module_l1}|{f.module_l2}"
+        if l2_key not in l2_fields_count:
+            l2_fields_count[l2_key] = {'total': 0, 'completed': 0}
+        l2_fields_count[l2_key]['total'] += 1
+        if f.status != '待审阅':
+            l2_fields_count[l2_key]['completed'] += 1
+    for l2_key, counts in l2_fields_count.items():
+        if counts['completed'] == 0:
+            l2_status[l2_key] = '#F2F3F5'  # 灰色：未开始
+        elif counts['completed'] == counts['total']:
+            l2_status[l2_key] = '#36CFC9'  # 绿色：全部完成
+        else:
+            l2_status[l2_key] = '#FFB800'  # 黄色：进行中
 
     # Read l2_说明 from Excel
     l2_description = ''
@@ -181,6 +196,7 @@ def review_workspace(project_id):
                            l2_description=l2_description,
                            pairs=pairs_data, l1_tree=l1_tree,
                            field_statuses=field_statuses,
+                           l2_status=l2_status,
                            assigned_map=assigned_map,
                            l2_index_map=l2_index_map,
                            user_list=get_all_users(),

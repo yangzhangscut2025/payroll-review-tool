@@ -87,7 +87,7 @@
                         <a href="{{ url_for('review.review_workspace', project_id=p.id) }}"
                            class="btn btn-outline-success" title="进入审阅">📋</a>
                         {% if p.file_path %}
-                        <a href="{{ url_for('export.export_result', project_id=p.id) }}"
+                        <a href="/projects/{{ p.id }}/export"
                            class="btn btn-outline-info" title="导出">📥</a>
                         {% endif %}
                         {% if p.created_by == username %}

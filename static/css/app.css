@@ -200,6 +200,7 @@ input:checked + .toggle-slider:before { transform: translateX(16px); }
     border-radius: 50%;
     margin-left: 4px;
     vertical-align: middle;
+    flex-shrink: 0;
 }
 
 /* ==================== Status Buttons ==================== */

@@ -135,16 +135,28 @@ LANG_MAP = {
 }
 
 TRANSLATION_PROMPT = (
-    '你是薪酬合规领域的专业翻译。请将以下审阅批注从中文翻译为{target_lang}。'
+    '你是薪酬合规领域的专业翻译。请将以下中文审阅批注翻译为{target_lang}。'
+    '每条中文对应一条英文原文参考，请参考英文原文的术语和风格来确保翻译准确。'
     '规则：\n'
-    '1. 法律/薪酬/税务术语必须准确，不得意译或简化\n'
+    '1. 法律/薪酬/税务术语必须与英文原文参考保持一致\n'
     '2. 文本中的 {{__T0__}} {{__T1__}} 等占位符必须原样保留，不能修改或删除\n'
     '3. 编号、数字、百分比、日期、法律条文编号保持原格式\n'
     '4. 输出纯 JSON 数组，每条严格对应输入的一条，不要任何解释文字\n'
-    '输入：\n{items}\n输出：'
+    '中文审阅：\n{items}\n英文原文参考：\n{refs}\n输出：'
 )
 
 TAG_PATTERN = re.compile(r'(<[^>]+>)')
+REVIEW_MARK_PATTERN = re.compile(r'<(span style|/s>|s>|strong>|/strong>)')
+
+
+def _strip_html(text):
+    """Remove HTML tags, return plain text."""
+    return TAG_PATTERN.sub('', text) if text else ''
+
+
+def _has_review_marks(text):
+    """Check if text has actual review formatting (not just <p>/<br> wrappers)."""
+    return bool(REVIEW_MARK_PATTERN.search(text)) if text else False
 
 
 def _protect_html(text):
@@ -168,8 +180,9 @@ def _restore_html(text, tag_map):
     return text
 
 
-def _translate_batch(items, target_lang, api_key, api_url, model, progress_callback=None):
+def _translate_batch(items, ref_texts, target_lang, api_key, api_url, model, progress_callback=None):
     """Translate a list of Chinese texts to target language using DeepSeek API.
+    ref_texts: English original texts for reference (same length as items).
     HTML tags are protected with placeholders during translation.
     Returns (translated_list, total_usage_dict)."""
     total_usage = {'prompt_tokens': 0, 'completion_tokens': 0}
@@ -177,8 +190,8 @@ def _translate_batch(items, target_lang, api_key, api_url, model, progress_callb
         return items, total_usage
 
     # Protect HTML tags in each item
-    protected_items = []
     tag_maps = []
+    protected_items = []
     for text in items:
         if '<' in text:
             protected, tag_map = _protect_html(text)
@@ -190,52 +203,78 @@ def _translate_batch(items, target_lang, api_key, api_url, model, progress_callb
 
     # Split into batches
     batches = [protected_items[i:i + BATCH_SIZE] for i in range(0, len(protected_items), BATCH_SIZE)]
+    ref_batches = [ref_texts[i:i + BATCH_SIZE] for i in range(0, len(ref_texts), BATCH_SIZE)]
     total_batches = len(batches)
     translated = []
 
     for batch_idx, batch in enumerate(batches):
         if progress_callback:
             progress_callback(batch_idx + 1, total_batches)
-        items_json = json.dumps(batch, ensure_ascii=False)
-        prompt = TRANSLATION_PROMPT.format(
-            target_lang=target_lang,
-            items=items_json
-        )
-        try:
-            resp = requests.post(
-                api_url,
-                json={
-                    'model': model,
-                    'messages': [{'role': 'user', 'content': prompt}],
-                    'temperature': 0.1,
-                    'max_tokens': 4096,
-                },
-                headers={
-                    'Authorization': f'Bearer {api_key}',
-                    'Content-Type': 'application/json',
-                },
-                timeout=120,
+
+        # Retry loop: if AI returns fewer items, retry the missing ones
+        pending = list(batch)
+        ref_pending = list(ref_batches[batch_idx])
+        batch_result = []
+        max_retries = 3
+
+        for retry in range(max_retries):
+            if not pending:
+                break
+            items_json = json.dumps(pending, ensure_ascii=False)
+            refs_json = json.dumps(ref_pending, ensure_ascii=False)
+            prompt = TRANSLATION_PROMPT.format(
+                target_lang=target_lang,
+                items=items_json,
+                refs=refs_json
             )
-            resp.raise_for_status()
-            result = resp.json()
-            content = result['choices'][0]['message']['content'].strip()
-            # Accumulate token usage for external logging
-            usage = result.get('usage', {})
-            total_usage['prompt_tokens'] += usage.get('prompt_tokens', 0)
-            total_usage['completion_tokens'] += usage.get('completion_tokens', 0)
-            if content.startswith('```'):
-                content = content.split('\n', 1)[1]
-                if content.endswith('```'):
-                    content = content.rsplit('\n', 1)[0]
-            parsed = json.loads(content)
-            translated.extend(parsed if isinstance(parsed, list) else batch)
-        except Exception as e:
-            translated.extend(batch)
+            try:
+                resp = requests.post(
+                    api_url,
+                    json={
+                        'model': model,
+                        'messages': [{'role': 'user', 'content': prompt}],
+                        'temperature': 0.1,
+                        'max_tokens': 4096,
+                    },
+                    headers={
+                        'Authorization': f'Bearer {api_key}',
+                        'Content-Type': 'application/json',
+                    },
+                    timeout=120,
+                )
+                resp.raise_for_status()
+                result = resp.json()
+                content = result['choices'][0]['message']['content'].strip()
+                total_usage['prompt_tokens'] += result.get('usage', {}).get('prompt_tokens', 0)
+                total_usage['completion_tokens'] += result.get('usage', {}).get('completion_tokens', 0)
+
+                if content.startswith('```'):
+                    content = content.split('\n', 1)[1]
+                    if content.endswith('```'):
+                        content = content.rsplit('\n', 1)[0]
+                parsed = json.loads(content)
+
+                if isinstance(parsed, list):
+                    n = min(len(parsed), len(pending))
+                    batch_result.extend(parsed[:n])
+                    pending = pending[n:]
+                    ref_pending = ref_pending[n:]  # retry the rest
+                    if not pending:
+                        break
+                else:
+                    break  # not a list, can't retry
+            except Exception:
+                break  # network error, give up
+
+        # Fill remaining with original
+        if pending:
+            batch_result.extend(pending)
+        translated.extend(batch_result)
 
     # Restore HTML tags
     result = []
     for i, text in enumerate(translated):
-        if tag_maps[i]:
+        if i < len(tag_maps) and tag_maps[i]:
             result.append(_restore_html(text, tag_maps[i]))
         else:
             result.append(text)
@@ -269,26 +308,48 @@ def generate_review_excel(input_path, output_path, review_map, format_version='v
         model = Config.DEEPSEEK_MODEL
 
         if api_key:
-            # Collect all (key, text) pairs that have content
-            text_entries = [
-                (key, rf.changed_content)
-                for key, rf in review_map.items()
-                if rf.changed_content and rf.changed_content.strip()
-            ]
+            # Only translate fields with actual review marks (color, bold, strikethrough)
+            text_entries = []
+            for key, rf in review_map.items():
+                changed = rf.changed_content
+                if changed and changed.strip() and _has_review_marks(changed):
+                    text_entries.append((key, changed))
             if text_entries:
                 keys, texts = zip(*text_entries)
                 texts = list(texts)
                 total_items = len(texts)
-                total_batches = (total_items + BATCH_SIZE - 1) // BATCH_SIZE
+                ...
+
+                # Read English original content for translation reference
+                en_refs = []
+                en_ws = wb.worksheets[1] if len(wb.worksheets) > 1 else None
+                if en_ws:
+                    en_headers = []
+                    for col in range(1, en_ws.max_column + 1):
+                        v = en_ws.cell(row=1, column=col).value
+                        en_headers.append(str(v).strip() if v else '')
+                    en_col_map = {}
+                    for h in en_headers:
+                        if h in review_cols:
+                            en_col_map[h] = en_headers.index(h) + 1
+                    for key, _ in text_entries:
+                        row, field_type = key
+                        col = en_col_map.get(field_type)
+                        if col:
+                            val = en_ws.cell(row=row, column=col).value
+                            en_refs.append(str(val).strip() if val else '')
+                        else:
+                            en_refs.append('')
+                else:
+                    en_refs = [''] * total_items
 
                 for sheet_name in translate_sheets:
-                    lang = LANG_MAP.get(sheet_name, sheet_name)
-                    _progress(10, f'翻译{lang}...')
+                    _progress(10, f'翻译英文...')
                     translated_texts, usage = _translate_batch(
-                        texts, lang, api_key, api_url, model,
+                        texts, en_refs, '英文', api_key, api_url, model,
                         progress_callback=lambda i, t: _progress(
                             10 + int(80 * (i / t) / len(translate_sheets)),
-                            f'翻译{lang} {i}/{t}'
+                            f'翻译英文 {i}/{t}'
                         ) if progress_callback else None
                     )
                     total_usage['prompt_tokens'] += usage['prompt_tokens']
@@ -296,24 +357,33 @@ def generate_review_excel(input_path, output_path, review_map, format_version='v
                     if len(translated_texts) == len(texts):
                         translations[sheet_name] = dict(zip(keys, translated_texts))
                     else:
-                        warnings.append(f'{sheet_name} 翻译数量不匹配，部分内容保持中文')
+                        matched = min(len(translated_texts), len(texts))
+                        partial = dict(zip(keys[:matched], translated_texts[:matched]))
+                        translations[sheet_name] = partial
+                        warnings.append(f'英文 sheet 翻译 {matched}/{len(texts)} 条，其余保持中文')
+            else:
+                _progress(10, '无需翻译（无改动内容）')
         else:
-            for sheet_name in translate_sheets:
-                warnings.append(f'{sheet_name} 未配置API Key，校验列保持中文原文')
+            warnings.append('未配置API Key，英文 sheet 保持中文原文')
 
-    # Only process Chinese and English sheets; skip local-language sheets
-    target_sheets = ['zh_Chinese'] + list(LANG_MAP.keys())
-    total_sheets = len([s for s in wb.sheetnames if s in target_sheets])
-    sheet_idx = 0
+    # Process sheets by position: first = Chinese, second = English, rest = skip
+    target_indices = [0]  # Chinese sheet
+    en_sheet_idx = None
+    if len(wb.worksheets) > 1:
+        target_indices.append(1)  # English sheet
+        en_sheet_idx = 1
+    translate_sheets = [wb.sheetnames[1]] if en_sheet_idx is not None else []
 
-    for ws in wb.worksheets:
-        if ws.title not in target_sheets:
+    for ws_idx, ws in enumerate(wb.worksheets):
+        if ws_idx not in target_indices:
             continue
 
         _state['sheet'] = ws.title
-        sheet_idx += 1
+        is_translated = (ws_idx == en_sheet_idx)
+        total_targets = len(target_indices)
+        current_idx = target_indices.index(ws_idx) + 1
         base_pct = 90 if not translate_sheets else 10 + int(80 / len(translate_sheets)) * len(translate_sheets)
-        _progress(base_pct + int((sheet_idx / total_sheets) * (100 - base_pct)),
+        _progress(base_pct + int((current_idx / total_targets) * (100 - base_pct)),
                   f'写入{ws.title}...')
         headers = []
         for col in range(1, ws.max_column + 1):
@@ -344,21 +414,53 @@ def generate_review_excel(input_path, output_path, review_map, format_version='v
                     rf = review_map[key]
                     cell = ws.cell(row=row, column=insert_col)
 
-                    bg_color = STATUS_BG_COLORS.get(rf.status)
-                    if bg_color and rf.status != '待审阅':
-                        cell.fill = PatternFill(start_color=bg_color,
-                                                end_color=bg_color, fill_type='solid')
-
                     content = rf.changed_content
-                    # Use translated content if available for this sheet
-                    if is_translated and key in translations.get(ws.title, {}):
-                        content = translations[ws.title][key]
+                    fallback = False
+                    if is_translated:
+                        has_marks = _has_review_marks(rf.changed_content)
+                        if key in translations.get(ws.title, {}):
+                            content = translations[ws.title][key]
+                        elif has_marks:
+                            orig_val = ws.cell(row=row, column=base_col).value
+                            if orig_val:
+                                content = str(orig_val).strip()
+                                fallback = True
+                        else:
+                            orig_val = ws.cell(row=row, column=base_col).value
+                            if orig_val:
+                                content = str(orig_val).strip()
 
                     if content:
+                        # Format invalid links for reference fields
+                        if '参考' in field_type or '网站' in field_type:
+                            link_statuses = rf.get_link_statuses()
+                            corrected = rf.get_corrected_links()
+                            if link_statuses:
+                                notes = []
+                                for url, status in link_statuses.items():
+                                    if status in ('打不开', '内容不符', '已过时'):
+                                        # Mark the URL in content: red + strikethrough
+                                        marked = f'<span style="color:#C00000;"><s>{url}</s></span>'
+                                        if url in corrected:
+                                            marked += f' → {corrected[url]}'
+                                        if url in content:
+                                            content = content.replace(url, marked)
+                                        notes.append(f'[{status}] {url}' + (f' → {corrected[url]}' if url in corrected else ''))
+                                if notes:
+                                    content += '\n\n【链接状态】\n' + '\n'.join(notes)
                         if '<' in content:
                             _apply_html_to_cell(cell, content)
                         else:
                             cell.value = content
+
+                    # Status color
+                    bg_color = STATUS_BG_COLORS.get(rf.status)
+                    if bg_color and rf.status != '待审阅':
+                        cell.fill = PatternFill(start_color=bg_color,
+                                                end_color=bg_color, fill_type='solid')
+                    # Fallback marker: yellow on top, always visible
+                    if fallback:
+                        cell.fill = PatternFill(start_color='FFFACD', end_color='FFFACD', fill_type='solid')
 
         for col in range(1, ws.max_column + 1):
             ws.column_dimensions[get_column_letter(col)].width = 25
